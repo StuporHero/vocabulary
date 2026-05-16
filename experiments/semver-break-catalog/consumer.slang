@@ -1,5 +1,10 @@
 import "@org/lib";
 
+// Each call below assigns to an unused local. That's deliberate:
+// slangc's type-check (which decides pass/fail for the catalogue)
+// runs before any dead-code elimination, so the unused locals are
+// load-bearing for break detection. Don't replace them with a
+// buffer store — that would introduce its own surface contact.
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void main(uint3 tid : SV_DispatchThreadID)

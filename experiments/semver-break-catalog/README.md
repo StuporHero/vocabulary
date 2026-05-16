@@ -158,14 +158,16 @@ note: see definition of 'needs_caps' ...
 The diagnostic chain (entry point → call site → declaration) is
 exactly the structure a publish-time tool would want.
 
-## Findings — secondary probe (`28f948f`)
+## Findings — secondary probe (`28f948f`, classification fixed in `4474455`)
 
-Two candidate existing digest sources tested against the 29 cases:
+Two candidate existing digest sources tested against the 29 cases.
+The probe classifies digest verdicts against each case's ACTUAL
+(empirical) outcome, not its a-priori EXPECTED label.
 
 |                       | ok | ok-err | OVER | MISS |
 | --------------------- | -- | ------ | ---- | ---- |
-| `-dump-module` (text) | 14 | 3      | 11   | **1** |
-| `.slang-module` (bin) | 13 | 3      | 13   | 0    |
+| `-dump-module` (text) | 13 | 3      | 12   | **1** |
+| `.slang-module` (bin) | 12 | 3      | 14   | 0    |
 
 `MISS` is the dangerous outcome — a digest that's "same" when the
 consumer actually breaks would let a major change slip through as a
@@ -177,19 +179,36 @@ annotations entirely.
 
 The binary `.slang-module` produces no false negatives in this
 catalogue. That's encouraging but not "sound": the sample is small
-enough that a wider catalogue could surface MISSes. Of the 15
-passing cases, it over-reports on 13 (an 87% over-rate), including
-invisible mutations like parameter renames.
+enough that a wider catalogue could surface MISSes.
+
+**Excluding the two identity controls** (`baseline/control` and
+`capabilities/baseline-control`, which are not mutations), there are
+14 real-mutation cases with ACTUAL=passes. The binary OVERs on all
+14 (100%); the text dump OVERs on 12 of 14 (86%). Including controls
+in the denominator (16 ACTUAL=passes total) yields 14/16 = 88% and
+12/16 = 75% respectively — but the controls aren't really
+contributing evidence about over-reporting, so the real-mutation rate
+is the honest one.
 
 `OVER` is not "just nuisance" the way the original legend implied.
 For a publish-time tool, OVER means the digest demands a major bump
-for a change that doesn't break consumers. At an 87% over-rate
-(13 of 15 passing cases for the binary; 11 of 15 for the text dump
-— 73%), authors would routinely be told "you need a major" for
-genuinely backwards-compatible patches, which trains them to override
-the tool, defeating the point of mechanical enforcement. (Elm gets
-away with its strict regime because its detection is precise; a tool
-with this OVER rate would not.)
+for a change that doesn't break consumers, training authors to
+override the tool and defeating the point of mechanical enforcement.
+
+There is a real tension here, though: several of the OVER cases are
+int↔float type changes (`change-return-type`, `change-method-return-type`,
+`change-param-type`, `change-field-type`) that slangc accepts via
+implicit conversion. The catalogue records "passes" because the
+compiler accepts; the digest flags "diff" because the source
+genuinely changed. **For a publish-time tool that treats type
+changes as breaking** (which the synthesis recommends), the digest
+flagging these is *desired* behavior, not OVER. The probe measures
+"digest vs. source-compatibility check"; a digest tuned for "semver
+intent" rather than "source compatibility" would correctly bump these
+to "breaks" and the OVER rate would drop. The high OVER rate against
+strict source-compat thus understates the digest's usefulness for an
+intent-based enforcement tool — but it remains an honest measurement
+of the gap between the two definitions.
 
 So no existing slangc artifact is sufficient on its own:
 
@@ -199,8 +218,9 @@ So no existing slangc artifact is sufficient on its own:
 A real digest would need to combine the binary's capability awareness
 with the text form's filtering, plus extra canonicalization to drop
 the things the catalogue showed are invisible (parameter names,
-generic parameter names, internal symbols). That's nontrivial work,
-but it's a *defined* nontrivial work, not an unknown.
+generic parameter names, internal symbols). That's a tractable next
+step, conditional on a wider catalogue not surfacing further blind
+spots that change the requirements.
 
 Also noted: the binary `.slang-module` embeds the absolute path of
 the source file. The probe stages each source as a canonical filename
@@ -210,12 +230,13 @@ need the same workaround (or a strip-path post-process).
 ## Synthesis: what the catalogue tells us about the semver question
 
 1. **Slang's diagnostics carry enough information to support an
-   Elm-style check; the digest mechanism remains the open problem.**
-   Mutations in the catalogue produce sharp, well-targeted error
-   messages — the necessary condition for a publish-time enforcement
-   tool is met. The sufficient condition (a stable, selective digest
-   that classifies deltas) is not. The probe shows that neither
-   existing slangc artifact is the digest by itself.
+   Elm-style check across this catalogue; the digest mechanism
+   remains the open problem.** Mutations in the catalogue produce
+   sharp, well-targeted error messages — the necessary condition for
+   a publish-time enforcement tool appears met across the cases
+   tested. The sufficient condition (a stable, selective digest that
+   classifies deltas) is not. The probe shows that neither existing
+   slangc artifact is the digest by itself.
 
 2. **The catalogue suggests three first-cut categories** for what a
    digest needs to distinguish (scoped to the access patterns the
@@ -288,15 +309,31 @@ compilation target," not as a general semver classification.
   (`[mutating]`, `[ForceInline]`), removing an overload from a set
   the consumer relies on, default values for generic type-args,
   interface-inheritance changes, visibility tightening on generics
-  or interfaces.
+  or interfaces, **changing the module's own declared name** (an
+  obvious break that would also stress the digest's identity
+  handling), and **import-graph changes** (the library adding,
+  removing, or version-bumping a transitive `import`).
 
-- **Sample size.** 29 cases — 14 breaks (3 ok-err + 11 surface),
-  15 passes — is enough to find direction and to surface a definite
-  MISS in the text-dump digest. It is not enough to claim bounds on
-  the binary's miss rate; the breaking-case denominator is small
-  enough that "no misses observed" should not be read as "sound." The
-  passing-case denominator (15) is better-evidenced and supports the
-  high OVER-rate conclusion more firmly.
+- **Sample size.** 29 cases — by ACTUAL outcome, 16 passes (2 of
+  which are identity controls; 14 real mutations) and 13 breaks
+  (3 of which are ok-err cases where the library no longer compiles).
+  Enough to find direction and to surface a definite MISS in the
+  text-dump digest. Not enough to claim bounds on the binary's miss
+  rate; the breaking-case denominator is small enough that "no
+  misses observed" should not be read as "sound."
+
+- **Prediction calibration.** Each case has an `EXPECTED` outcome
+  that was authored before the case's category was run. Categories
+  were added incrementally (commits `fecf74a` → `68a01d4` → `ac6c146`
+  → `ae44dab`), so predictions in later batches were informed by
+  findings in earlier ones. Specifically: the function-level run
+  surfaced the int→float warning surprise (`change-return-type`
+  predicted breaks, actually passes); the type-level
+  (`change-field-type`) and interface-level (`change-method-return-type`)
+  predictions for analogous int→float mutations were then authored
+  knowing slangc's implicit-conversion lenience. They're consistency
+  checks, not blind predictions. Only the function-level
+  `change-return-type` was truly blind.
 
 ## Re-running
 

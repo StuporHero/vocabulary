@@ -1,5 +1,5 @@
 Slang semver-break catalogue
-Date  : 2026-05-16T20:47:01Z
+Date  : 2026-05-16T20:49:53Z
 Slangc: 2026.8.1
 
 ================================================================
@@ -21,11 +21,11 @@ ACTUAL   : breaks    [ok]
 EXIT     : 255
 ----------------------------------------------------------------
 warning[E36113]: using internal capability name
- --> <STAGE>/@org/lib.slang:5:2
-  |
-5 | [require(hlsl, _sm_6_5)]
-  |  ^^^^^^^ '_sm_6_5' resolves into a '_Internal' '__sm_6_5' Capability, use '_sm_6_5' instead.
---'
+  --> <STAGE>/@org/lib.slang:11:2
+   |
+11 | [require(hlsl, _sm_6_5)]
+   |  ^^^^^^^ '_sm_6_5' resolves into a '_Internal' '__sm_6_5' Capability, use '_sm_6_5' instead.
+---'
 error[E36107]: unavailable features in entry point
  --> cases/capabilities/cross-target-require/consumer.slang:5:6
   |
@@ -39,17 +39,17 @@ note: see using of 'needs_caps'
   |         ^^^^^^^^^^
 --'
 note: see definition of 'needs_caps'
- --> <STAGE>/@org/lib.slang:6:12
-  |
-6 | public int needs_caps() { return 42; }
-  |            ^^^^^^^^^^
---'
+  --> <STAGE>/@org/lib.slang:12:12
+   |
+12 | public int needs_caps() { return 42; }
+   |            ^^^^^^^^^^
+---'
 note: see declaration of 'require'
- --> <STAGE>/@org/lib.slang:5:2
-  |
-5 | [require(hlsl, _sm_6_5)]
-  |  ^^^^^^^
---'
+  --> <STAGE>/@org/lib.slang:11:2
+   |
+11 | [require(hlsl, _sm_6_5)]
+   |  ^^^^^^^
+---'
 
 ================================================================
 CASE     : capabilities/narrow-require
@@ -76,9 +76,9 @@ ACTUAL   : breaks    [ok]
 EXIT     : 255
 ----------------------------------------------------------------
 error[E38029]: type argument doesn't conform to interface
-  --> consumer.slang:20:13
+  --> consumer.slang:25:13
    |
-20 | int t = total_area<Square>(sq1, sq2);
+25 | int t = total_area<Square>(sq1, sq2);
    |         ^^^^^^^^^^ type argument 'Square' does not conform to the required interface 'IShape'
 ---'
 
@@ -89,11 +89,11 @@ ACTUAL   : breaks    [ok]
 EXIT     : 255
 ----------------------------------------------------------------
 error[E38029]: type argument doesn't conform to interface
- --> consumer.slang:8:13
-  |
-8 | int i = identity<int>(3);
-  |         ^^^^^^^^ type argument 'int' does not conform to the required interface 'IShape'
---'
+  --> consumer.slang:13:13
+   |
+13 | int i = identity<int>(3);
+   |         ^^^^^^^^ type argument 'int' does not conform to the required interface 'IShape'
+---'
 
 ================================================================
 CASE     : functions/add-overload
@@ -114,11 +114,11 @@ ACTUAL   : breaks    [ok]
 EXIT     : 255
 ----------------------------------------------------------------
 error[E39999]: not enough arguments to call
- --> consumer.slang:7:16
-  |
-7 | int s = add(1, 2);
-  |            ^ not enough arguments to call (got 2, expected 3)
---'
+  --> consumer.slang:12:16
+   |
+12 | int s = add(1, 2);
+   |            ^ not enough arguments to call (got 2, expected 3)
+---'
 note[E40011]: candidate: public func add(int, int, int) -> int
  --> <STAGE>/@org/lib.slang:4:12
   |
@@ -139,11 +139,11 @@ ACTUAL   : passes    [SURPRISE]
 EXIT     : 0
 ----------------------------------------------------------------
 warning[E30081]: implicit conversion not recommended
- --> consumer.slang:7:16
-  |
-7 | int s = add(1, 2);
-  |            ^ implicit conversion from 'float' to 'int' is not recommended
---'
+  --> consumer.slang:12:16
+   |
+12 | int s = add(1, 2);
+   |            ^ implicit conversion from 'float' to 'int' is not recommended
+---'
 
 ================================================================
 CASE     : functions/remove-param
@@ -152,11 +152,11 @@ ACTUAL   : breaks    [ok]
 EXIT     : 255
 ----------------------------------------------------------------
 error[E39999]: too many arguments to call
- --> consumer.slang:7:16
-  |
-7 | int s = add(1, 2);
-  |            ^ too many arguments to call (got 2, expected 1)
---'
+  --> consumer.slang:12:16
+   |
+12 | int s = add(1, 2);
+   |            ^ too many arguments to call (got 2, expected 1)
+---'
 note[E40011]: candidate: public func add(int) -> int
  --> <STAGE>/@org/lib.slang:4:12
   |
@@ -183,11 +183,11 @@ ACTUAL   : breaks    [ok]
 EXIT     : 255
 ----------------------------------------------------------------
 error[E30015]: undefined identifier
- --> consumer.slang:7:13
-  |
-7 | int s = add(1, 2);
-  |         ^^^ undefined identifier 'add'.
---'
+  --> consumer.slang:12:13
+   |
+12 | int s = add(1, 2);
+   |         ^^^ undefined identifier 'add'.
+---'
 
 ================================================================
 CASE     : interfaces/add-associated-type
@@ -254,9 +254,9 @@ ACTUAL   : passes    [ok]
 EXIT     : 0
 ----------------------------------------------------------------
 warning[E30081]: implicit conversion not recommended
-  --> consumer.slang:19:21
+  --> consumer.slang:24:21
    |
-19 | int a = sq1.area();
+24 | int a = sq1.area();
    |                 ^ implicit conversion from 'float' to 'int' is not recommended
 ---'
 
@@ -267,9 +267,9 @@ ACTUAL   : breaks    [ok]
 EXIT     : 255
 ----------------------------------------------------------------
 error[E30027]: member not found
-  --> consumer.slang:19:17
+  --> consumer.slang:24:17
    |
-19 | int a = sq1.area();
+24 | int a = sq1.area();
    |             ^^^^ 'area' is not a member of 'Square'.
 ---'
 
@@ -292,9 +292,9 @@ ACTUAL   : breaks    [ok]
 EXIT     : 255
 ----------------------------------------------------------------
 error[E30600]: declaration not accessible
-  --> consumer.slang:11:7
+  --> consumer.slang:16:7
    |
-11 | p.x = 4;
+16 | p.x = 4;
    |   ^ 'x' is not accessible from the current context.
 ---'
 
@@ -305,9 +305,9 @@ ACTUAL   : breaks    [ok]
 EXIT     : 255
 ----------------------------------------------------------------
 error[E30027]: member not found
-  --> consumer.slang:12:7
+  --> consumer.slang:17:7
    |
-12 | p.y = 5;
+17 | p.y = 5;
    |   ^ 'y' is not a member of 'Point'.
 ---'
 
@@ -318,9 +318,9 @@ ACTUAL   : breaks    [ok]
 EXIT     : 255
 ----------------------------------------------------------------
 error[E30027]: member not found
-  --> consumer.slang:11:7
+  --> consumer.slang:16:7
    |
-11 | p.x = 4;
+16 | p.x = 4;
    |   ^ 'x' is not a member of 'Point'.
 ---'
 

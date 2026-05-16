@@ -1,5 +1,5 @@
 Slang -dump-module probe
-Date  : 2026-05-16T20:47:10Z
+Date  : 2026-05-16T20:50:03Z
 
 Step 1. Stability check: same baseline compiled twice.
   hash 1: 7edae499d79a0098111ea2158789881d5e826efaa08a9a0f4ed1188f29efd64c
