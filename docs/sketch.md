@@ -40,8 +40,8 @@ real-time rendering and GPU-compute projects with reproducible builds.
 - A module declares **capability** requirements (SM level, raytracing, mesh
   shaders, wave ops, atomics on f16, …) — closer to Conan profiles than to
   Cargo features.
-- Targets are plural: HLSL, SPIR-V, GLSL, Metal, WGSL, CUDA, C++. Some
-  modules are target-agnostic; some are not.
+- Targets are plural: HLSL, DXIL, SPIR-V, GLSL, Metal, WGSL, CUDA, C++.
+  Some modules are target-agnostic; some are not.
 - Generics + interfaces + link-time specialization mean a module's public API
   surface is richer than a function signature list — semver compatibility
   rules need a Slang-aware definition.
@@ -59,10 +59,14 @@ Pinning these now to avoid bikeshedding later.
   `.slang` source files compiled together.
 - **Package** — the unit this registry distributes. A package may contain
   one or more modules (default: one).
-- **Target** — a compilation backend (`hlsl`, `spirv`, `metal`, `wgsl`,
-  `glsl`, `cuda`, `cpp`, `ptx`).
-- **Capability** — a Slang-declared requirement (e.g. `sm_6_5`,
-  `raytracing`, `mesh`, `wave_ops`).
+- **Target** — a compilation backend. The shader-language targets a
+  package manifest will typically declare are `hlsl`, `dxil`, `spirv`,
+  `glsl`, `metal`, `wgsl`, `cuda`, and `cpp`. `slangc` supports additional
+  output forms (`metallib`, `host-cpp`, `torch`, …) that are out of scope
+  for v0 manifests.
+- **Capability** — a Slang-declared requirement (e.g. `_sm_6_5`,
+  `raytracing`, `mesh`, `subgroup_basic`). Atom names and the implication
+  lattice are defined in `slang-capabilities.capdef`.
 - **Profile** — a `(compiler-version, target, capability-set)` triple
   against which an artifact is built.
 - **Artifact** — a built blob (`.slang-module` or per-target intermediate)
