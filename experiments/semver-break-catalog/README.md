@@ -15,8 +15,9 @@ is replaced with measurement. See the "Limitations" section below for
 what the catalogue does *not* cover.
 
 The probe addresses the secondary question — do any existing
-slangc-emitted artifacts (`-dump-module` text, the binary
-`.slang-module` file) already constitute a usable signature digest?
+slangc-emitted artifacts (`-dump-module`'s IR disassembly, the
+raw `.slang-module` binary serialisation) already constitute a
+usable signature digest?
 
 ## Slangc version
 
@@ -33,7 +34,7 @@ generic function constrained on the interface. It does **not** cover
 enums, extensions, operator overloads / `__init`, nested namespaces,
 resource-typed parameters, or `inout`/`out`. A fixed consumer
 (`consumer.slang`) calls each piece via concrete-type dispatch (not
-through an existential interface reference).
+through an interface-typed value with dynamic dispatch).
 
 Each case under `cases/<category>/<name>/` contains a `lib.slang` that
 differs from the baseline by one mutation, plus an `EXPECTED` file
@@ -43,11 +44,12 @@ against it, and records the actual outcome side-by-side with the
 prediction. Capability cases bring their own consumer because they
 need a `[require]`-gated call site.
 
-**Compilation scope.** Every case compiles to `-target spirv -stage
-compute` under slangc's default profile. Capability findings in
-particular are defined by the target; a glsl- or hlsl-bound consumer
-might flip individual outcomes. Slang's capability docs (`user-guide
-ch. 5`) describe mutually-exclusive capability groups — target atoms
+**Compilation scope.** Every case compiles with `-target spirv
+-stage compute -entry main` and no explicit `-profile` flag.
+Capability findings in particular are defined by the target; a
+glsl- or hlsl-bound consumer might flip individual outcomes. Slang's
+capability docs (`user-guide/05-capabilities.md`) describe
+mutually-exclusive capability groups — target atoms
 (`hlsl`, `glsl`, `spirv`, `metal`, `wgsl`, `cuda`, `cpp`) are one
 such group; stage atoms (`vertex`, `fragment`, `compute`, …) are
 another. The catalogue's capability findings are scoped to a
@@ -117,7 +119,7 @@ compiles and the consumer is unaffected. The user-guide flags one
 wrinkle this catalogue doesn't exercise: if a conforming type already
 has a method with the same name and signature, that type now needs
 an explicit `override` keyword to disambiguate
-(`user-guide/06-interfaces-generics.md` §"Default Methods"). Within
+(`user-guide/06-interfaces-generics.md` lines 49-70). Within
 that constraint, default-method additions are a real affordance for
 non-major bumps.
 
@@ -134,13 +136,23 @@ not just diff its surface, to catch this.
 consumer calls `sq1.area()` directly on the concrete `Square`, so the
 int-from-float conversion goes through the same implicit-coercion
 path that `functions/change-return-type` already exercised. A
-consumer that dispatched via an existential (`IShape s = sq1;
+consumer that dispatched via an interface-typed value (`IShape s = sq1;
 s.area()`) might or might not behave the same way — that's untested.
 
+(Interface-member visibility isn't catalogued either. Slang's rule
+is that interface members inherit visibility from the parent
+interface — `user-guide/04-modules-and-access-control.md` L185 — so
+`public→internal` demotion on an interface method isn't a separate
+mutation shape from demoting the whole interface, which we cover.)
+
 Adding a new conformance for an entirely new type
-(`add-conformance-elsewhere`) is non-breaking — Slang's overload
-resolution doesn't pick up ambiguity from types the consumer never
-references.
+(`add-conformance-elsewhere`) is non-breaking — Slang's name
+resolution and generic specialization at sites that don't mention
+the new type aren't perturbed by its existence. (Overload resolution
+isn't really the relevant mechanism here: nothing in the consumer
+calls into two ambiguous candidates. The claim is narrower than that:
+adding a new type and its conformance leaves untouched code
+untouched.)
 
 ## Findings — capability mutations (`ae44dab`, with `widen-spirv-version` dropped in `ab5cbbc`)
 
@@ -156,12 +168,14 @@ review: its EXPECTED was authored without a clear a-priori prediction
 — the lib.slang comment said "outcome depends ... recording the
 empirical answer" — so it didn't count as a real test.)
 
-Removing the `[require]` and narrowing within the same target atom
-lineage (`spirv_1_3` → `spirv_1_0`) are non-breaking for the
-spirv-compute consumer under slangc's default profile. The catalogue
-does **not** cover widening within that lineage or adding a
-requirement whose target the consumer's profile already implies;
-either could behave differently.
+Removing the `[require]` and narrowing to an atom that the original
+implies (`spirv_1_3` → `spirv_1_0`; per `user-guide/05-capabilities.md`
+lines 44-54, a Slang capability can imply other capabilities, and the
+checker expands all implications) are non-breaking for the
+spirv-compute consumer with no explicit `-profile` flag. The catalogue
+does **not** cover the opposite direction (widening to a strictly
+larger implication) or adding a requirement whose atoms the consumer
+already satisfies; either could behave differently.
 
 Switching to a conflicting target atom (`spirv_1_3` → `hlsl + sm_6_5`,
 across the target mutually-exclusive group) breaks the spirv consumer
@@ -186,18 +200,25 @@ Two candidate existing digest sources tested against the 29 cases.
 The probe classifies digest verdicts against each case's ACTUAL
 (empirical) outcome, not its a-priori EXPECTED label.
 
-|                       | ok | ok-err | OVER | MISS |
-| --------------------- | -- | ------ | ---- | ---- |
-| `-dump-module` (text) | 13 | 3      | 12   | **1** |
-| `.slang-module` (bin) | 12 | 3      | 14   | 0    |
+|                              | ok | ok-err | OVER | MISS |
+| ---------------------------- | -- | ------ | ---- | ---- |
+| `-dump-module` (disassembly) | 13 | 3      | 12   | **1** |
+| `.slang-module` (raw IR)     | 12 | 3      | 14   | 0    |
+
+Both digest sources are hashes of the same module IR: the
+disassembly is the IR printed as text via slangc's `-dump-module`,
+which omits some annotations (notably capability requirements); the
+raw form is the on-disk binary serialisation. The differences in the
+table below are properties of what each form *includes* in its
+output, not "text vs binary" in any deeper sense.
 
 `MISS` is the dangerous outcome — a digest that's "same" when the
 consumer actually breaks would let a major change slip through as a
-minor bump. The text dump misses one case in the catalogue:
-`capabilities/cross-target-require`. Verified manually: the dump for
-`[require(spirv_1_3)]` is byte-identical to the dump for
-`[require(hlsl, sm_6_5)]`. The text disassembly strips capability
-annotations entirely.
+minor bump. The disassembly misses one case in the catalogue:
+`capabilities/cross-target-require`. Verified manually: the
+disassembly for `[require(spirv_1_3)]` is byte-identical to the one
+for `[require(hlsl, sm_6_5)]`. `-dump-module` doesn't print capability
+annotations at all.
 
 The binary `.slang-module` produces no false negatives in this
 catalogue. That's encouraging but not "sound": the sample is small
@@ -284,9 +305,9 @@ invocations is not tested here.
      group) inside a `[require]` declaration.
    - **Conditionally additive** — add field, reorder fields, add
      overload, add interface method *with* default, add conformance
-     for a new type, parameter/generic-param rename, narrowing within
-     the same target-atom lineage and removing a `[require]` entirely.
-     These passed under the catalogue's
+     for a new type, parameter/generic-param rename, narrowing to an
+     atom that the original implies, and removing a `[require]`
+     entirely. These passed under the catalogue's
      consumer; some are conditionally safe under specific access
      patterns (e.g. add-field and reorder-fields rely on named field
      access — a positional-init consumer would flip both).
@@ -302,14 +323,16 @@ invocations is not tested here.
    purposes, treat type changes as breaking.
 
 3. **The digest mechanism is not a single slangc artifact today.**
-   Building it means combining the IR (for structural surface),
-   per-symbol capability DNF extraction, and a canonicalization pass
-   that strips identifiers that the catalogue showed are invisible.
-   This is the spec-deferral the sketch already calls for, but now
-   the catalogue gives a (limited) set of concrete acceptance
-   criteria for it. The "no MISS observed for the binary" claim
-   that motivates building on the binary form is fragile at this
-   sample size — see the Limitations bullet on sample size.
+   Building it means combining the IR (for structural surface — note
+   that the IR captures the *unspecialized* generic form, which is
+   what a digest would actually hash), per-symbol capability DNF
+   extraction, and a canonicalization pass that strips identifiers
+   the catalogue showed are invisible. This is the spec-deferral the
+   sketch already calls for, but now the catalogue gives a (limited)
+   set of concrete acceptance criteria for it. The "no MISS observed
+   for the binary" claim that motivates building on the binary form
+   is fragile at this sample size — see the Limitations bullet on
+   sample size.
 
 4. **Publish-time tooling must compile the library, not just diff
    surfaces.** Cases like `interfaces/add-method-no-default` produce
@@ -327,7 +350,7 @@ compilation target," not as a general semver classification.
 - **Single consumer pattern.** The consumer uses one access shape per
   surface element: one generic call, one struct field write (named,
   not positional), one method call. It does **not** exercise
-  existential dispatch on `IShape` (`IShape s = sq; s.area()`),
+  dynamic dispatch via an interface-typed value (`IShape s = sq; s.area()`),
   positional struct init (`Point{4,5}`), `inout`/`out` parameters,
   aliased types, `extension`-defined methods, or generic constraints
   binding multiple interfaces. Some catalogue "passes" verdicts are
@@ -400,12 +423,13 @@ diagnostics. The slangc binary is downloaded once into the gitignored
 The methodology review surfaced three follow-ups that would
 strengthen the catalogue's claims rather than merely extend them:
 
-1. **Second consumer.** Add a consumer that uses existential
-   dispatch on `IShape`, positional struct init, and `inout`/`out`
-   parameters. Re-run the catalogue against both. The matrix will
-   distinguish "unconditionally non-breaking" from "non-breaking
-   under this access pattern" — and likely flip several catalogue
-   "passes" to conditional verdicts.
+1. **Second consumer.** Add a consumer that uses dynamic dispatch
+   via an interface-typed value (`IShape s = sq; s.area()`),
+   positional struct init, and `inout`/`out` parameters. Re-run the
+   catalogue against both. The matrix will distinguish
+   "unconditionally non-breaking" from "non-breaking under this
+   access pattern" — and likely flip several catalogue "passes" to
+   conditional verdicts.
 
 2. **Prototype the digest.** Build a canonicalised signature from
    `-dump-module` text plus per-symbol capability DNF extraction, and

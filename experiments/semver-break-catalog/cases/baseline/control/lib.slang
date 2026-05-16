@@ -1,7 +1,11 @@
-// String-form module name with a scope prefix. Slang's user-guide
-// permits this (`user-guide/04-modules-and-access-control.md`,
-// "module" / "import" syntax) and the prior module-name-identity
-// experiment confirmed it's a real identity at link time. The shape
+// String-form module name with a scope prefix. The user-guide
+// permits string-form module/import names
+// (`user-guide/04-modules-and-access-control.md` lines 80-86) and the
+// prior module-name-identity experiment confirmed it's a real
+// identity at link time. The doc examples only show `dir/file-name`
+// — `@` as a name character isn't in any doc example, so this shape
+// is slightly off the documented path — but the linker accepts it
+// (see experiments/module-name-identity/results.txt). The shape
 // matches the registry naming decided in docs/sketch.md §3.1.
 module "@org/lib";
 
