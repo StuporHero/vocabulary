@@ -16,7 +16,7 @@ what the catalogue does *not* cover.
 
 The probe addresses the secondary question — do any existing
 slangc-emitted artifacts (`-dump-module`'s IR disassembly, the
-raw `.slang-module` binary serialisation) already constitute a
+serialised `.slang-module` module file) already constitute a
 usable signature digest?
 
 ## Slangc version
@@ -42,18 +42,45 @@ recording the predicted outcome (`passes` or `breaks`). The runner
 stages each case at `<tmp>/@org/lib.slang`, compiles the consumer
 against it, and records the actual outcome side-by-side with the
 prediction. Capability cases bring their own consumer because they
-need a `[require]`-gated call site.
+need a call into a `[require]`-annotated function: Slang attaches
+the requirement to the declaration, and the entry point inherits
+requirements from everything it transitively calls. The check
+happens at the entry-point boundary against the target.
+
+**Baseline is deliberately minimal.** It's a representative public
+surface for the catalogue's purposes (function / generic / struct /
+interface / conformance), but it doesn't look like a real Slang
+library: there are no `__init` constructors, no `extension`s, no
+interface inheritance, no `where`-clause with multiple bounds, and
+`identity<T>` is intentionally unconstrained because that's the
+test subject for `add-generic-constraint`. Production Slang code
+would use constrained generics by default
+(`user-guide/06-interfaces-generics.md` L95 explicitly warns
+against bare `<T>`). The consumer's `Square sq1; sq1.side = 6;`
+pattern is also unidiomatic but chosen so the catalogue isolates
+named-field-access semantics from constructor semantics. See
+Limitations for what's untested as a consequence.
 
 **Compilation scope.** Every case compiles with `-target spirv
 -stage compute -entry main` and no explicit `-profile` flag.
 Capability findings in particular are defined by the target; a
 glsl- or hlsl-bound consumer might flip individual outcomes. Slang's
-capability docs (`user-guide/05-capabilities.md`) describe
-mutually-exclusive capability groups — target atoms
-(`hlsl`, `glsl`, `spirv`, `metal`, `wgsl`, `cuda`, `cpp`) are one
-such group; stage atoms (`vertex`, `fragment`, `compute`, …) are
-another. The catalogue's capability findings are scoped to a
-spirv-compute consumer.
+capability atoms come in distinct categories that the README will
+reference (`user-guide/05-capabilities.md`,
+`user-guide/a3-02-reference-capability-atoms.md`):
+
+- **Target atoms** (`hlsl`, `glsl`, `spirv`, `metal`, `wgsl`,
+  `cuda`, `cpp`) — mutually exclusive within the target group.
+- **Version atoms** (`spirv_1_0`…`spirv_1_6`, `sm_6_0`…`sm_6_8`, …)
+  — refine a target; later versions imply earlier ones.
+- **Extension / feature atoms** (`SPV_KHR_*`, `spvShaderClockKHR`,
+  `subgroup_basic`, …) — additional capabilities a target may or
+  may not provide.
+- **Stage atoms** (`vertex`, `fragment`, `compute`, …) — mutually
+  exclusive within the stage group.
+
+The catalogue's capability findings are scoped to a spirv-compute
+consumer.
 
 Re-run with `bash experiments/semver-break-catalog/run.sh` and
 `bash experiments/semver-break-catalog/probe-dump-module.sh`.
@@ -117,20 +144,22 @@ default implementation is non-breaking** under the catalogue's
 conditions. Conforming types fall back to the default; the library
 compiles and the consumer is unaffected. The user-guide flags one
 wrinkle this catalogue doesn't exercise: if a conforming type already
-has a method with the same name and signature, that type now needs
-an explicit `override` keyword to disambiguate
-(`user-guide/06-interfaces-generics.md` lines 49-70). Within
-that constraint, default-method additions are a real affordance for
+has a method with the same name and signature, that method must now
+be explicitly marked `override` — the keyword is a required marker
+that the conformer is intentionally providing its own implementation
+of the interface requirement, not a disambiguator
+(`user-guide/06-interfaces-generics.md` lines 49-70). Within that
+constraint, default-method additions are a real affordance for
 non-major bumps.
 
 Adding a method *without* a default breaks differently: the library
 itself fails to compile because the existing conforming type doesn't
 satisfy the new requirement. Adding an associated type behaves the
-same way — Slang has no associated-type analogue of method defaults,
-so every conforming type must provide a binding. The consumer's
-`import` then fails with `error[E39999]: import failed due to
-compilation error`. A publish-time tool has to compile the library,
-not just diff its surface, to catch this.
+same way — the catalogue did not find a default-binding mechanism
+for associated types, so every conforming type must provide a
+binding. The consumer's `import` then fails with `error[E39999]:
+import failed due to compilation error`. A publish-time tool has to
+compile the library, not just diff its surface, to catch this.
 
 `change-method-return-type` is not an independent data point: the
 consumer calls `sq1.area()` directly on the concrete `Square`, so the
@@ -168,18 +197,23 @@ review: its EXPECTED was authored without a clear a-priori prediction
 — the lib.slang comment said "outcome depends ... recording the
 empirical answer" — so it didn't count as a real test.)
 
-Removing the `[require]` and narrowing to an atom that the original
-implies (`spirv_1_3` → `spirv_1_0`; per `user-guide/05-capabilities.md`
-lines 44-54, a Slang capability can imply other capabilities, and the
-checker expands all implications) are non-breaking for the
-spirv-compute consumer with no explicit `-profile` flag. The catalogue
-does **not** cover the opposite direction (widening to a strictly
-larger implication) or adding a requirement whose atoms the consumer
-already satisfies; either could behave differently.
+Removing the `[require]` and narrowing along the SPIR-V version
+chain (`spirv_1_3` → `spirv_1_0`) are non-breaking for the spirv-
+compute consumer. `spirv_1_3` and `spirv_1_0` are *version* atoms,
+not target atoms; `spirv_1_3` implies `spirv_1_0` plus the additional
+atoms a 1.3 implementation provides
+(`user-guide/05-capabilities.md` lines 44-54: capabilities can imply
+others, and the checker expands all implications). The catalogue
+does **not** cover widening along the version chain or adding
+extension/feature atoms; either could behave differently.
 
-Switching to a conflicting target atom (`spirv_1_3` → `hlsl + sm_6_5`,
-across the target mutually-exclusive group) breaks the spirv consumer
-with a precise diagnostic:
+Switching to an incompatible target atom (`spirv_1_3` → `hlsl + sm_6_5`)
+breaks the spirv consumer. The original requirement transitively
+implies the `spirv` target atom; the new requirement names the `hlsl`
+target atom; `spirv` and `hlsl` are mutually exclusive in the
+target-atom group, so the two requirements are *incompatible* in
+Slang's terminology (`user-guide/05-capabilities.md` L60-62). The
+diagnostic is precise:
 
 ```
 error[E36107]: unavailable features in entry point
@@ -200,17 +234,21 @@ Two candidate existing digest sources tested against the 29 cases.
 The probe classifies digest verdicts against each case's ACTUAL
 (empirical) outcome, not its a-priori EXPECTED label.
 
-|                              | ok | ok-err | OVER | MISS |
-| ---------------------------- | -- | ------ | ---- | ---- |
-| `-dump-module` (disassembly) | 13 | 3      | 12   | **1** |
-| `.slang-module` (raw IR)     | 12 | 3      | 14   | 0    |
+|                                  | ok | ok-err | OVER | MISS |
+| -------------------------------- | -- | ------ | ---- | ---- |
+| `-dump-module` (IR disassembly)  | 13 | 3      | 12   | **1** |
+| `.slang-module` (serialised mod.)| 12 | 3      | 14   | 0    |
 
-Both digest sources are hashes of the same module IR: the
-disassembly is the IR printed as text via slangc's `-dump-module`,
-which omits some annotations (notably capability requirements); the
-raw form is the on-disk binary serialisation. The differences in the
-table below are properties of what each form *includes* in its
-output, not "text vs binary" in any deeper sense.
+`.slang-module` is the on-disk binary serialisation of a Slang
+*module*, which contains the IR plus module metadata (the source
+path the probe has to strip is one such metadatum;
+`user-guide/08-compiling.md` L57-58 names this form). `-dump-module`
+is disassembly of the IR section only
+(`command-line-slangc-reference.md`: "Disassemble and print the
+module IR"), which is why it omits things the IR has but the
+disassembler doesn't print — notably `[require]` capability
+annotations. The MISS finding below is a structural property of
+that asymmetry, not a surprise.
 
 `MISS` is the dangerous outcome — a digest that's "same" when the
 consumer actually breaks would let a major change slip through as a
@@ -297,17 +335,21 @@ invocations is not tested here.
    - **Breaking by signature** — function/method rename, required
      parameter add, remove, type/field rename or remove, visibility
      demotion, conformance removal, interface method add without
-     default, associated-type add (associated types have no
-     default-binding equivalent of method defaults), generic
+     default, associated-type add (the catalogue didn't find a
+     default-binding mechanism for associated types, so adding one
+     requires every conformer to supply a binding), generic
      constraint tightening.
-   - **Breaking by capability** — switching to a conflicting atom in
-     a mutually-exclusive group (e.g. spirv → hlsl in the target
-     group) inside a `[require]` declaration.
+   - **Breaking by capability** — switching to an *incompatible*
+     `[require]`, i.e. naming an atom that conflicts with one the
+     original (transitively) implied within a mutually-exclusive
+     atom group (target group: spirv ↔ hlsl ↔ metal ↔ …; stage
+     group: vertex ↔ fragment ↔ compute ↔ …).
    - **Conditionally additive** — add field, reorder fields, add
      overload, add interface method *with* default, add conformance
-     for a new type, parameter/generic-param rename, narrowing to an
-     atom that the original implies, and removing a `[require]`
-     entirely. These passed under the catalogue's
+     for a new type, parameter/generic-param rename, narrowing along
+     a capability-implication chain (e.g. `spirv_1_3` → `spirv_1_0`),
+     and removing a `[require]` entirely. These passed under the
+     catalogue's
      consumer; some are conditionally safe under specific access
      patterns (e.g. add-field and reorder-fields rely on named field
      access — a positional-init consumer would flip both).
