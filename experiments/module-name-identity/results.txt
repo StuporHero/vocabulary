@@ -1,0 +1,77 @@
+Slang module-name-identity probe
+Date: 2026-05-16T17:39:49Z
+Slangc: 2026.8.1
+
+================================================================
+CASE: 1. precompile @a/math to .slang-module
+CMD : slangc -emit-ir pkgs/@a/math.slang -o <out.slang-module>
+----------------------------------------------------------------
+----------------------------------------------------------------
+EXIT: 0
+
+================================================================
+CASE: 1b. precompile @b/math to .slang-module
+CMD : slangc -emit-ir pkgs/@b/math.slang -o <out.slang-module>
+----------------------------------------------------------------
+----------------------------------------------------------------
+EXIT: 0
+
+================================================================
+CASE: 2. precompile plain_math to .slang-module
+CMD : slangc -emit-ir pkgs/plain-math.slang -o <out.slang-module>
+----------------------------------------------------------------
+----------------------------------------------------------------
+EXIT: 0
+
+================================================================
+CASE: 3. consumer imports BOTH @a/math and @b/math
+CMD : slangc -target spirv -stage compute -entry main -I pkgs consumer-string.slang -o <out.spv>
+----------------------------------------------------------------
+----------------------------------------------------------------
+EXIT: 0
+
+================================================================
+CASE: 4. identifier-form import of plain_math
+CMD : slangc -target spirv -stage compute -entry main -I pkgs consumer-ident.slang -o <out.spv>
+----------------------------------------------------------------
+----------------------------------------------------------------
+EXIT: 0
+
+================================================================
+CASE: 5. consumer imports ONLY @a/math
+CMD : slangc -target spirv -stage compute -entry main -I pkgs consumer-a-only.slang -o <out.spv>
+----------------------------------------------------------------
+----------------------------------------------------------------
+EXIT: 0
+
+================================================================
+CASE: 6. identifier-import of a string-declared module
+CMD : slangc -target spirv -stage compute -entry main -I pkgs-conflict consumer-conflict.slang -o <out.spv>
+----------------------------------------------------------------
+----------------------------------------------------------------
+EXIT: 0
+
+================================================================
+CASE: 7. two modules export the SAME symbol name
+CMD : slangc -target spirv -stage compute -entry main -I pkgs-collide consumer-collide.slang -o <out.spv>
+----------------------------------------------------------------
+error[E39999]: ambiguous call to 'dup_marker' with arguments of type ()
+ --> consumer-collide.slang:8:25
+  |
+8 | int sum = dup_marker();
+  |                     ^ ambiguous call to 'dup_marker' with arguments of type ()
+--'
+note[E40011]: candidate: public func dup_marker() -> int
+ --> pkgs-collide/@b/dup.slang:3:12
+  |
+3 | public int dup_marker() { return 20; }
+  |            ^^^^^^^^^^
+--'
+note[E40011]: candidate: public func dup_marker() -> int
+ --> pkgs-collide/@a/dup.slang:3:12
+  |
+3 | public int dup_marker() { return 10; }
+  |            ^^^^^^^^^^
+--'
+----------------------------------------------------------------
+EXIT: 255
