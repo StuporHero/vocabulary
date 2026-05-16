@@ -1,5 +1,5 @@
 Slang semver-break catalogue
-Date  : 2026-05-16T19:53:48Z
+Date  : 2026-05-16T19:55:40Z
 Slangc: 2026.8.1
 
 ================================================================
@@ -9,5 +9,112 @@ ACTUAL   : passes    [ok]
 EXIT     : 0
 
 ================================================================
-TOTAL    : 1
-SURPRISES: 0
+CASE     : functions/add-generic-constraint
+EXPECTED : breaks
+ACTUAL   : breaks    [ok]
+EXIT     : 255
+----------------------------------------------------------------
+error[E38029]: type argument doesn't conform to interface
+ --> /home/user/vocabulary/experiments/semver-break-catalog/consumer.slang:8:13
+  |
+8 | int i = identity<int>(3);
+  |         ^^^^^^^^ type argument 'int' does not conform to the required interface 'IShape'
+--'
+
+================================================================
+CASE     : functions/add-overload
+EXPECTED : passes
+ACTUAL   : passes    [ok]
+EXIT     : 0
+
+================================================================
+CASE     : functions/add-param-default
+EXPECTED : passes
+ACTUAL   : passes    [ok]
+EXIT     : 0
+
+================================================================
+CASE     : functions/add-param
+EXPECTED : breaks
+ACTUAL   : breaks    [ok]
+EXIT     : 255
+----------------------------------------------------------------
+error[E39999]: not enough arguments to call
+ --> /home/user/vocabulary/experiments/semver-break-catalog/consumer.slang:7:16
+  |
+7 | int s = add(1, 2);
+  |            ^ not enough arguments to call (got 2, expected 3)
+--'
+note[E40011]: candidate: public func add(int, int, int) -> int
+ --> /tmp/tmp.ljA4RouPTx/@org/lib.slang:4:12
+  |
+4 | public int add(int x, int y, int z) { return x + y + z; }
+  |            ^^^
+--'
+
+================================================================
+CASE     : functions/change-param-type
+EXPECTED : passes
+ACTUAL   : passes    [ok]
+EXIT     : 0
+
+================================================================
+CASE     : functions/change-return-type
+EXPECTED : breaks
+ACTUAL   : passes    [SURPRISE]
+EXIT     : 0
+----------------------------------------------------------------
+warning[E30081]: implicit conversion not recommended
+ --> /home/user/vocabulary/experiments/semver-break-catalog/consumer.slang:7:16
+  |
+7 | int s = add(1, 2);
+  |            ^ implicit conversion from 'float' to 'int' is not recommended
+--'
+
+================================================================
+CASE     : functions/remove-param
+EXPECTED : breaks
+ACTUAL   : breaks    [ok]
+EXIT     : 255
+----------------------------------------------------------------
+error[E39999]: too many arguments to call
+ --> /home/user/vocabulary/experiments/semver-break-catalog/consumer.slang:7:16
+  |
+7 | int s = add(1, 2);
+  |            ^ too many arguments to call (got 2, expected 1)
+--'
+note[E40011]: candidate: public func add(int) -> int
+ --> /tmp/tmp.ljA4RouPTx/@org/lib.slang:4:12
+  |
+4 | public int add(int x) { return x; }
+  |            ^^^
+--'
+
+================================================================
+CASE     : functions/rename-generic-param
+EXPECTED : passes
+ACTUAL   : passes    [ok]
+EXIT     : 0
+
+================================================================
+CASE     : functions/rename-param
+EXPECTED : passes
+ACTUAL   : passes    [ok]
+EXIT     : 0
+
+================================================================
+CASE     : functions/rename
+EXPECTED : breaks
+ACTUAL   : breaks    [ok]
+EXIT     : 255
+----------------------------------------------------------------
+error[E30015]: undefined identifier
+ --> /home/user/vocabulary/experiments/semver-break-catalog/consumer.slang:7:13
+  |
+7 | int s = add(1, 2);
+  |         ^^^ undefined identifier 'add'.
+--'
+
+================================================================
+TOTAL    : 11
+SURPRISES: 1
