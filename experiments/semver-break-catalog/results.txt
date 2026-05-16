@@ -1,0 +1,13 @@
+Slang semver-break catalogue
+Date  : 2026-05-16T19:53:48Z
+Slangc: 2026.8.1
+
+================================================================
+CASE     : baseline/control
+EXPECTED : passes
+ACTUAL   : passes    [ok]
+EXIT     : 0
+
+================================================================
+TOTAL    : 1
+SURPRISES: 0
