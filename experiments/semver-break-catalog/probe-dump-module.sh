@@ -87,8 +87,11 @@ h2="$(dump_hash "${HERE}/baseline/lib.slang")"
   echo "  - Capability cases compared against capabilities/baseline-control/lib.slang"
   echo "    (they share a different baseline; the lib.slang structure is smaller)."
   echo "  - Two digest sources compared: -dump-module text vs raw .slang-module file."
+  echo "  - Digest verdicts are classified against the empirical (ACTUAL)"
+  echo "    outcome from results.txt, not the author's a-priori prediction"
+  echo "    (EXPECTED). Both are shown for reference."
   echo ""
-  printf '%-45s %-8s %-9s %-9s %s\n' "case" "expected" "dump" "file" "notes"
+  printf '%-45s %-7s %-7s %-9s %-9s %s\n' "case" "pred" "actual" "dump" "file" "notes"
 } >> "${OUT}"
 
 baseline_dump_hash="${h1}"
@@ -96,10 +99,24 @@ baseline_file_hash="$(file_hash "${HERE}/baseline/lib.slang")"
 cap_baseline_dump_hash="$(dump_hash "${HERE}/cases/capabilities/baseline-control/lib.slang")"
 cap_baseline_file_hash="$(file_hash "${HERE}/cases/capabilities/baseline-control/lib.slang")"
 
+actual_for_case() {
+  # Read the ACTUAL field for the given case from results.txt. Falls back to
+  # the literal "?" if results.txt is missing or stale (run.sh hasn't been run).
+  local rel="$1"
+  awk -v target="CASE     : ${rel}" '
+    $0 == target { found = 1; next }
+    found && /^ACTUAL[ ]+:/ {
+      sub(/^ACTUAL[ ]+:[ ]+/, "")
+      print $1
+      exit
+    }
+  ' "${HERE}/results.txt" 2>/dev/null
+}
+
 classify_one() {
-  local expected="$1"
+  local actual="$1"
   local result="$2"
-  case "${expected}:${result}" in
+  case "${actual}:${result}" in
     breaks:diff)    echo "ok" ;;
     passes:same)    echo "ok" ;;
     breaks:same)    echo "MISS" ;;
@@ -124,6 +141,8 @@ for case_dir in "${HERE}"/cases/*/*/; do
   rel="${case_dir#${HERE}/cases/}"
   rel="${rel%/}"
   expected="$(cat "${case_dir}/EXPECTED" 2>/dev/null || echo "?")"
+  actual="$(actual_for_case "${rel}")"
+  [[ -z "${actual}" ]] && actual="?"
 
   if [[ "${rel}" == capabilities/* ]]; then
     cmp_dump="${cap_baseline_dump_hash}"
@@ -144,10 +163,10 @@ for case_dir in "${HERE}"/cases/*/*/; do
   elif [[ "${fh}" == "${cmp_file}" ]]; then fr="same"
   else fr="diff"; fi
 
-  dv="$(classify_one "${expected}" "${dr}")"
-  fv="$(classify_one "${expected}" "${fr}")"
+  dv="$(classify_one "${actual}" "${dr}")"
+  fv="$(classify_one "${actual}" "${fr}")"
 
-  printf '%-45s %-8s %-9s %-9s dump=%s file=%s\n' "${rel}" "${expected}" "${dr}" "${fr}" "${dv}" "${fv}" >> "${OUT}"
+  printf '%-45s %-7s %-7s %-9s %-9s dump=%s file=%s\n' "${rel}" "${expected}" "${actual}" "${dr}" "${fr}" "${dv}" "${fv}" >> "${OUT}"
 done
 shopt -u nullglob
 
