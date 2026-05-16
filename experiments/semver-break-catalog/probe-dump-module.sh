@@ -109,6 +109,15 @@ classify_one() {
     *)              echo "?" ;;
   esac
 }
+# Legend interpretation:
+#   ok      = digest verdict agrees with empirical outcome.
+#   ok-err  = library no longer compiles; either digest signals it.
+#   MISS    = false negative — digest matches when consumer breaks. Lets a
+#             real major change ship as minor. Dangerous.
+#   OVER    = false positive — digest differs when consumer doesn't break.
+#             Not "harmless": for a publish-time tool this forces a
+#             major-version bump for a change that doesn't need one,
+#             which trains authors to override or ignore the tool.
 
 shopt -s nullglob
 for case_dir in "${HERE}"/cases/*/*/; do
@@ -144,10 +153,15 @@ shopt -u nullglob
 
 {
   echo ""
-  echo "Legend: ok = digest agrees with empirical outcome;"
-  echo "        MISS = digest matches when consumer actually breaks (false negative, dangerous);"
-  echo "        OVER = digest differs when consumer doesn't break (false positive, only nuisance);"
-  echo "        ok-err = library no longer compiles; either digest signals it correctly."
+  echo "Legend:"
+  echo "  ok     = digest verdict agrees with empirical outcome."
+  echo "  ok-err = library no longer compiles; either digest signals it."
+  echo "  MISS   = false negative — digest matches when consumer breaks."
+  echo "           Lets a real major change ship as minor. Dangerous."
+  echo "  OVER   = false positive — digest differs when consumer doesn't"
+  echo "           break. For a publish-time tool this forces a major"
+  echo "           bump that wasn't needed, which trains authors to"
+  echo "           override or ignore the tool. Not 'just nuisance.'"
 } >> "${OUT}"
 
 echo "==> Wrote ${OUT}"

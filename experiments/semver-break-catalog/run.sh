@@ -56,8 +56,8 @@ run_case() {
   local out
   out="$("${SLANGC}" -target spirv -stage compute -entry main \
     -I "${STAGE_DIR}" -o "${STAGE_DIR}/out.spv" \
-    "${consumer}" 2>&1)"
-  local rc=$?
+    "${consumer}" 2>&1 | sed -e "s|${STAGE_DIR}|<STAGE>|g" -e "s|${HERE}/||g")"
+  local rc=${PIPESTATUS[0]}
   rm -f "${STAGE_DIR}/out.spv"
 
   local actual

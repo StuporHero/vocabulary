@@ -1,5 +1,5 @@
 Slang semver-break catalogue
-Date  : 2026-05-16T20:26:55Z
+Date  : 2026-05-16T20:28:51Z
 Slangc: 2026.8.1
 
 ================================================================
@@ -21,31 +21,31 @@ ACTUAL   : breaks    [ok]
 EXIT     : 255
 ----------------------------------------------------------------
 warning[E36113]: using internal capability name
- --> /tmp/tmp.tfCM1S9vkR/@org/lib.slang:5:2
+ --> <STAGE>/@org/lib.slang:5:2
   |
 5 | [require(hlsl, _sm_6_5)]
   |  ^^^^^^^ '_sm_6_5' resolves into a '_Internal' '__sm_6_5' Capability, use '_sm_6_5' instead.
 --'
 error[E36107]: unavailable features in entry point
- --> /home/user/vocabulary/experiments/semver-break-catalog/cases/capabilities/cross-target-require/consumer.slang:5:6
+ --> cases/capabilities/cross-target-require/consumer.slang:5:6
   |
 5 | void main(uint3 tid : SV_DispatchThreadID)
   |      ^^^^ entrypoint 'main' uses features that are not available in 'compute' stage for 'spirv' compilation target.
 --'
 note: see using of 'needs_caps'
- --> /home/user/vocabulary/experiments/semver-break-catalog/cases/capabilities/cross-target-require/consumer.slang:7:13
+ --> cases/capabilities/cross-target-require/consumer.slang:7:13
   |
 7 | int n = needs_caps();
   |         ^^^^^^^^^^
 --'
 note: see definition of 'needs_caps'
- --> /tmp/tmp.tfCM1S9vkR/@org/lib.slang:6:12
+ --> <STAGE>/@org/lib.slang:6:12
   |
 6 | public int needs_caps() { return 42; }
   |            ^^^^^^^^^^
 --'
 note: see declaration of 'require'
- --> /tmp/tmp.tfCM1S9vkR/@org/lib.slang:5:2
+ --> <STAGE>/@org/lib.slang:5:2
   |
 5 | [require(hlsl, _sm_6_5)]
   |  ^^^^^^^
@@ -76,7 +76,7 @@ ACTUAL   : breaks    [ok]
 EXIT     : 255
 ----------------------------------------------------------------
 error[E38029]: type argument doesn't conform to interface
-  --> /home/user/vocabulary/experiments/semver-break-catalog/consumer.slang:20:13
+  --> consumer.slang:20:13
    |
 20 | int t = total_area<Square>(sq1, sq2);
    |         ^^^^^^^^^^ type argument 'Square' does not conform to the required interface 'IShape'
@@ -89,7 +89,7 @@ ACTUAL   : breaks    [ok]
 EXIT     : 255
 ----------------------------------------------------------------
 error[E38029]: type argument doesn't conform to interface
- --> /home/user/vocabulary/experiments/semver-break-catalog/consumer.slang:8:13
+ --> consumer.slang:8:13
   |
 8 | int i = identity<int>(3);
   |         ^^^^^^^^ type argument 'int' does not conform to the required interface 'IShape'
@@ -114,13 +114,13 @@ ACTUAL   : breaks    [ok]
 EXIT     : 255
 ----------------------------------------------------------------
 error[E39999]: not enough arguments to call
- --> /home/user/vocabulary/experiments/semver-break-catalog/consumer.slang:7:16
+ --> consumer.slang:7:16
   |
 7 | int s = add(1, 2);
   |            ^ not enough arguments to call (got 2, expected 3)
 --'
 note[E40011]: candidate: public func add(int, int, int) -> int
- --> /tmp/tmp.tfCM1S9vkR/@org/lib.slang:4:12
+ --> <STAGE>/@org/lib.slang:4:12
   |
 4 | public int add(int x, int y, int z) { return x + y + z; }
   |            ^^^
@@ -139,7 +139,7 @@ ACTUAL   : passes    [SURPRISE]
 EXIT     : 0
 ----------------------------------------------------------------
 warning[E30081]: implicit conversion not recommended
- --> /home/user/vocabulary/experiments/semver-break-catalog/consumer.slang:7:16
+ --> consumer.slang:7:16
   |
 7 | int s = add(1, 2);
   |            ^ implicit conversion from 'float' to 'int' is not recommended
@@ -152,13 +152,13 @@ ACTUAL   : breaks    [ok]
 EXIT     : 255
 ----------------------------------------------------------------
 error[E39999]: too many arguments to call
- --> /home/user/vocabulary/experiments/semver-break-catalog/consumer.slang:7:16
+ --> consumer.slang:7:16
   |
 7 | int s = add(1, 2);
   |            ^ too many arguments to call (got 2, expected 1)
 --'
 note[E40011]: candidate: public func add(int) -> int
- --> /tmp/tmp.tfCM1S9vkR/@org/lib.slang:4:12
+ --> <STAGE>/@org/lib.slang:4:12
   |
 4 | public int add(int x) { return x; }
   |            ^^^
@@ -183,7 +183,7 @@ ACTUAL   : breaks    [ok]
 EXIT     : 255
 ----------------------------------------------------------------
 error[E30015]: undefined identifier
- --> /home/user/vocabulary/experiments/semver-break-catalog/consumer.slang:7:13
+ --> consumer.slang:7:13
   |
 7 | int s = add(1, 2);
   |         ^^^ undefined identifier 'add'.
@@ -196,19 +196,19 @@ ACTUAL   : breaks    [ok]
 EXIT     : 255
 ----------------------------------------------------------------
 error[E38100]: missing interface member
-  --> /tmp/tmp.tfCM1S9vkR/@org/lib.slang:21:24
+  --> <STAGE>/@org/lib.slang:21:24
    |
 21 | public struct Square : IShape
    |                        ^^^^^^ type 'Square' does not provide required interface member 'Coord'
 ---'
 note: see declaration of 'Coord'
-  --> /tmp/tmp.tfCM1S9vkR/@org/lib.slang:17:20
+  --> <STAGE>/@org/lib.slang:17:20
    |
 17 | associatedtype Coord;
    |                ^^^^^
 ---'
 error[E39999]: import failed due to compilation error
- --> /home/user/vocabulary/experiments/semver-break-catalog/consumer.slang:1:8
+ --> consumer.slang:1:8
   |
 1 | import "@org/lib";
   |        ^^^^^^^^^^ import of module '@org/lib' failed because of a compilation error
@@ -222,19 +222,19 @@ ACTUAL   : breaks    [ok]
 EXIT     : 255
 ----------------------------------------------------------------
 error[E38100]: missing interface member
-  --> /tmp/tmp.tfCM1S9vkR/@org/lib.slang:21:24
+  --> <STAGE>/@org/lib.slang:21:24
    |
 21 | public struct Square : IShape
    |                        ^^^^^^ type 'Square' does not provide required interface member 'perimeter'
 ---'
 note: see declaration of 'perimeter'
-  --> /tmp/tmp.tfCM1S9vkR/@org/lib.slang:18:9
+  --> <STAGE>/@org/lib.slang:18:9
    |
 18 | int perimeter();
    |     ^^^^^^^^^
 ---'
 error[E39999]: import failed due to compilation error
- --> /home/user/vocabulary/experiments/semver-break-catalog/consumer.slang:1:8
+ --> consumer.slang:1:8
   |
 1 | import "@org/lib";
   |        ^^^^^^^^^^ import of module '@org/lib' failed because of a compilation error
@@ -254,7 +254,7 @@ ACTUAL   : passes    [ok]
 EXIT     : 0
 ----------------------------------------------------------------
 warning[E30081]: implicit conversion not recommended
-  --> /home/user/vocabulary/experiments/semver-break-catalog/consumer.slang:19:21
+  --> consumer.slang:19:21
    |
 19 | int a = sq1.area();
    |                 ^ implicit conversion from 'float' to 'int' is not recommended
@@ -267,7 +267,7 @@ ACTUAL   : breaks    [ok]
 EXIT     : 255
 ----------------------------------------------------------------
 error[E30027]: member not found
-  --> /home/user/vocabulary/experiments/semver-break-catalog/consumer.slang:19:17
+  --> consumer.slang:19:17
    |
 19 | int a = sq1.area();
    |             ^^^^ 'area' is not a member of 'Square'.
@@ -292,7 +292,7 @@ ACTUAL   : breaks    [ok]
 EXIT     : 255
 ----------------------------------------------------------------
 error[E30600]: declaration not accessible
-  --> /home/user/vocabulary/experiments/semver-break-catalog/consumer.slang:11:7
+  --> consumer.slang:11:7
    |
 11 | p.x = 4;
    |   ^ 'x' is not accessible from the current context.
@@ -305,7 +305,7 @@ ACTUAL   : breaks    [ok]
 EXIT     : 255
 ----------------------------------------------------------------
 error[E30027]: member not found
-  --> /home/user/vocabulary/experiments/semver-break-catalog/consumer.slang:12:7
+  --> consumer.slang:12:7
    |
 12 | p.y = 5;
    |   ^ 'y' is not a member of 'Point'.
@@ -318,7 +318,7 @@ ACTUAL   : breaks    [ok]
 EXIT     : 255
 ----------------------------------------------------------------
 error[E30027]: member not found
-  --> /home/user/vocabulary/experiments/semver-break-catalog/consumer.slang:11:7
+  --> consumer.slang:11:7
    |
 11 | p.x = 4;
    |   ^ 'x' is not a member of 'Point'.
@@ -337,19 +337,19 @@ ACTUAL   : breaks    [ok]
 EXIT     : 255
 ----------------------------------------------------------------
 error[E30601]: visibility higher than parent
-  --> /tmp/tmp.tfCM1S9vkR/@org/lib.slang:10:16
+  --> <STAGE>/@org/lib.slang:10:16
    |
 10 | public int x;
    |            ^ 'x' cannot have a higher visibility than 'Point'.
 ---'
 error[E30601]: visibility higher than parent
-  --> /tmp/tmp.tfCM1S9vkR/@org/lib.slang:11:16
+  --> <STAGE>/@org/lib.slang:11:16
    |
 11 | public int y;
    |            ^ 'y' cannot have a higher visibility than 'Point'.
 ---'
 error[E39999]: import failed due to compilation error
- --> /home/user/vocabulary/experiments/semver-break-catalog/consumer.slang:1:8
+ --> consumer.slang:1:8
   |
 1 | import "@org/lib";
   |        ^^^^^^^^^^ import of module '@org/lib' failed because of a compilation error
