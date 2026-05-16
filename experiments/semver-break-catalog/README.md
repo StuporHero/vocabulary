@@ -25,11 +25,15 @@ Pinned in both `run.sh` and `probe-dump-module.sh`.
 
 ## Method
 
-A baseline library (`baseline/lib.slang`) declares a representative
-public surface: a function, a generic function, a struct with named
-fields, an interface with one method, a type conforming to that
-interface, and a generic function constrained on the interface. A
-fixed consumer (`consumer.slang`) calls each piece.
+A baseline library (`baseline/lib.slang`) declares a **minimal public
+surface** covering function/generic/struct/interface/conformance: a
+function, a generic function, a struct with named fields, an
+interface with one method, a type conforming to that interface, and a
+generic function constrained on the interface. It does **not** cover
+enums, extensions, operator overloads / `__init`, nested namespaces,
+resource-typed parameters, or `inout`/`out`. A fixed consumer
+(`consumer.slang`) calls each piece via concrete-type dispatch (not
+through an existential interface reference).
 
 Each case under `cases/<category>/<name>/` contains a `lib.slang` that
 differs from the baseline by one mutation, plus an `EXPECTED` file
@@ -116,6 +120,13 @@ requirement. The consumer's `import` then fails with
 time tool has to compile the library, not just diff its surface, to
 catch this.
 
+`change-method-return-type` is not an independent data point: the
+consumer calls `sq1.area()` directly on the concrete `Square`, so the
+int-from-float conversion goes through the same implicit-coercion
+path that `functions/change-return-type` already exercised. A
+consumer that dispatched via an existential (`IShape s = sq1;
+s.area()`) might or might not behave the same way — that's untested.
+
 Adding a new conformance for an entirely new type
 (`add-conformance-elsewhere`) is non-breaking — Slang's overload
 resolution doesn't pick up ambiguity from types the consumer never
@@ -184,11 +195,12 @@ enough that a wider catalogue could surface MISSes.
 **Excluding the two identity controls** (`baseline/control` and
 `capabilities/baseline-control`, which are not mutations), there are
 14 real-mutation cases with ACTUAL=passes. The binary OVERs on all
-14 (100%); the text dump OVERs on 12 of 14 (86%). Including controls
-in the denominator (16 ACTUAL=passes total) yields 14/16 = 88% and
-12/16 = 75% respectively — but the controls aren't really
-contributing evidence about over-reporting, so the real-mutation rate
-is the honest one.
+of them (14/14); the text dump OVERs on 12/14. With a denominator
+this small, a single misclassification would shift these by ~7
+points — the fractions are reported as fractions, not percentages,
+for that reason. Including the controls in the denominator (16
+total) gives 14/16 and 12/16 respectively, but the controls aren't
+contributing evidence about over-reporting either way.
 
 `OVER` is not "just nuisance" the way the original legend implied.
 For a publish-time tool, OVER means the digest demands a major bump
@@ -227,16 +239,24 @@ the source file. The probe stages each source as a canonical filename
 before compiling; any production tool that hashes the binary would
 need the same workaround (or a strip-path post-process).
 
+**Precompile invocation.** The probe precompiles each case via
+`slangc -emit-ir <lib.slang>`. A real publish-time tool might use
+different flags (e.g. an explicit `-O0`, target-specific options,
+or `-stage`-agnostic builds), and digest stability under those
+invocations is not tested here.
+
 ## Synthesis: what the catalogue tells us about the semver question
 
 1. **Slang's diagnostics carry enough information to support an
-   Elm-style check across this catalogue; the digest mechanism
-   remains the open problem.** Mutations in the catalogue produce
-   sharp, well-targeted error messages — the necessary condition for
-   a publish-time enforcement tool appears met across the cases
-   tested. The sufficient condition (a stable, selective digest that
-   classifies deltas) is not. The probe shows that neither existing
-   slangc artifact is the digest by itself.
+   Elm-style check for the mutation shapes tested; the digest
+   mechanism remains the open problem.** Mutations in the catalogue
+   produce sharp, well-targeted error messages — the necessary
+   condition for a publish-time enforcement tool appears met for the
+   mutation shapes tested. The sufficient condition (a stable,
+   selective digest that classifies deltas) is not. The probe shows
+   that neither existing slangc artifact is the digest by itself.
+   The omitted mutation categories (see Limitations) could in
+   principle change either conclusion.
 
 2. **The catalogue suggests three first-cut categories** for what a
    digest needs to distinguish (scoped to the access patterns the
@@ -260,17 +280,22 @@ need the same workaround (or a strip-path post-process).
    A note rather than a fourth category: Slang accepts some `int`↔`float`
    mismatches as implicit conversions (silently or with a warning) —
    `change-return-type`, `change-method-return-type`, `change-param-type`,
-   `change-field-type`. Three of those passed; one warned. That's
-   evidence of an implicit-conversion rule, not a structurally
-   distinct kind of break. For digest purposes, treat type changes as
-   breaking.
+   `change-field-type`. Three of those passed; one warned. They all
+   reflect the same implicit-conversion rule observed once at the
+   function-return level and seen again at field, parameter, and
+   interface-method-return positions; they are not independent
+   evidence of a structurally distinct kind of break. For digest
+   purposes, treat type changes as breaking.
 
 3. **The digest mechanism is not a single slangc artifact today.**
    Building it means combining the IR (for structural surface),
    per-symbol capability DNF extraction, and a canonicalization pass
    that strips identifiers that the catalogue showed are invisible.
    This is the spec-deferral the sketch already calls for, but now
-   the catalogue gives concrete acceptance criteria for it.
+   the catalogue gives a (limited) set of concrete acceptance
+   criteria for it. The "no MISS observed for the binary" claim
+   that motivates building on the binary form is fragile at this
+   sample size — see the Limitations bullet on sample size.
 
 4. **Publish-time tooling must compile the library, not just diff
    surfaces.** Cases like `interfaces/add-method-no-default` produce
@@ -333,7 +358,14 @@ compilation target," not as a general semver classification.
   predictions for analogous int→float mutations were then authored
   knowing slangc's implicit-conversion lenience. They're consistency
   checks, not blind predictions. Only the function-level
-  `change-return-type` was truly blind.
+  `change-return-type` was truly blind for the int↔float family.
+
+  Tally for the catalogue as a whole: of 29 cases, 27 were a-priori
+  predictions when authored (2 of those are trivial identity
+  controls); 2 (`types/change-field-type`,
+  `interfaces/change-method-return-type`) are confirmatory consistency
+  checks of the int↔float coercion rule observed in
+  `functions/change-return-type`.
 
 ## Re-running
 

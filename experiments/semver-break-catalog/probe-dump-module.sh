@@ -65,7 +65,7 @@ file_hash() {
   echo "Slang -dump-module probe"
   echo "Date  : $(date -u +%Y-%m-%dT%H:%M:%SZ)"
   echo ""
-  echo "Step 1. Stability check: same baseline compiled twice."
+  echo "Step 1a. Stability of -dump-module text: same baseline compiled twice."
 } >> "${OUT}"
 
 h1="$(dump_hash "${HERE}/baseline/lib.slang")"
@@ -77,6 +77,22 @@ h2="$(dump_hash "${HERE}/baseline/lib.slang")"
     echo "  -> STABLE: hashes match across runs."
   else
     echo "  -> UNSTABLE: hashes differ across runs of the same source."
+  fi
+} >> "${OUT}"
+
+{
+  echo ""
+  echo "Step 1b. Stability of binary .slang-module: same baseline compiled twice."
+} >> "${OUT}"
+bh1="$(file_hash "${HERE}/baseline/lib.slang")"
+bh2="$(file_hash "${HERE}/baseline/lib.slang")"
+{
+  echo "  hash 1: ${bh1}"
+  echo "  hash 2: ${bh2}"
+  if [[ "${bh1}" == "${bh2}" ]]; then
+    echo "  -> STABLE: binary hashes match across runs."
+  else
+    echo "  -> UNSTABLE: binary hashes differ — header timestamps or similar leak."
   fi
 } >> "${OUT}"
 
