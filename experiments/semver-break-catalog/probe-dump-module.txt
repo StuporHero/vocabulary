@@ -1,0 +1,50 @@
+Slang -dump-module probe
+Date  : 2026-05-16T20:05:41Z
+
+Step 1. Stability check: same baseline compiled twice.
+  hash 1: 7edae499d79a0098111ea2158789881d5e826efaa08a9a0f4ed1188f29efd64c
+  hash 2: 7edae499d79a0098111ea2158789881d5e826efaa08a9a0f4ed1188f29efd64c
+  -> STABLE: hashes match across runs.
+
+Step 2. Per-case digest vs baseline.
+  - Main surface cases compared against baseline/lib.slang.
+  - Capability cases compared against capabilities/baseline-control/lib.slang
+    (they share a different baseline; the lib.slang structure is smaller).
+  - Two digest sources compared: -dump-module text vs raw .slang-module file.
+
+case                                          expected dump      file      notes
+baseline/control                              passes   same      same      dump=ok file=ok
+capabilities/baseline-control                 passes   same      same      dump=ok file=ok
+capabilities/cross-target-require             breaks   same      diff      dump=MISS file=ok
+capabilities/narrow-require                   passes   same      diff      dump=ok file=OVER
+capabilities/remove-require                   passes   same      diff      dump=ok file=OVER
+capabilities/widen-spirv-version              passes   same      diff      dump=ok file=OVER
+conformances/add-conformance-elsewhere        passes   diff      diff      dump=OVER file=OVER
+conformances/remove-conformance               breaks   diff      diff      dump=ok file=ok
+functions/add-generic-constraint              breaks   diff      diff      dump=ok file=ok
+functions/add-overload                        passes   diff      diff      dump=OVER file=OVER
+functions/add-param-default                   passes   diff      diff      dump=OVER file=OVER
+functions/add-param                           breaks   diff      diff      dump=ok file=ok
+functions/change-param-type                   passes   diff      diff      dump=OVER file=OVER
+functions/change-return-type                  breaks   diff      diff      dump=ok file=ok
+functions/remove-param                        breaks   diff      diff      dump=ok file=ok
+functions/rename-generic-param                passes   diff      diff      dump=OVER file=OVER
+functions/rename-param                        passes   diff      diff      dump=OVER file=OVER
+functions/rename                              breaks   diff      diff      dump=ok file=ok
+interfaces/add-associated-type                breaks   ERROR-emit ERROR-emit dump=ok-err file=ok-err
+interfaces/add-method-no-default              breaks   ERROR-emit ERROR-emit dump=ok-err file=ok-err
+interfaces/add-method-with-default            passes   diff      diff      dump=OVER file=OVER
+interfaces/change-method-return-type          passes   diff      diff      dump=OVER file=OVER
+interfaces/rename-method                      breaks   diff      diff      dump=ok file=ok
+types/add-field                               passes   diff      diff      dump=OVER file=OVER
+types/change-field-type                       passes   diff      diff      dump=OVER file=OVER
+types/field-public-to-internal                breaks   diff      diff      dump=ok file=ok
+types/remove-field                            breaks   diff      diff      dump=ok file=ok
+types/rename-field                            breaks   diff      diff      dump=ok file=ok
+types/reorder-fields                          passes   diff      diff      dump=OVER file=OVER
+types/type-public-to-internal                 breaks   ERROR-emit ERROR-emit dump=ok-err file=ok-err
+
+Legend: ok = digest agrees with empirical outcome;
+        MISS = digest matches when consumer actually breaks (false negative, dangerous);
+        OVER = digest differs when consumer doesn't break (false positive, only nuisance);
+        ok-err = library no longer compiles; either digest signals it correctly.
