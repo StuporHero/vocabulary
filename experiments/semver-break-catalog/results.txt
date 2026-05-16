@@ -1,5 +1,5 @@
 Slang semver-break catalogue
-Date  : 2026-05-16T20:00:34Z
+Date  : 2026-05-16T20:26:55Z
 Slangc: 2026.8.1
 
 ================================================================
@@ -21,7 +21,7 @@ ACTUAL   : breaks    [ok]
 EXIT     : 255
 ----------------------------------------------------------------
 warning[E36113]: using internal capability name
- --> /tmp/tmp.DnkuEKtF6z/@org/lib.slang:5:2
+ --> /tmp/tmp.tfCM1S9vkR/@org/lib.slang:5:2
   |
 5 | [require(hlsl, _sm_6_5)]
   |  ^^^^^^^ '_sm_6_5' resolves into a '_Internal' '__sm_6_5' Capability, use '_sm_6_5' instead.
@@ -39,13 +39,13 @@ note: see using of 'needs_caps'
   |         ^^^^^^^^^^
 --'
 note: see definition of 'needs_caps'
- --> /tmp/tmp.DnkuEKtF6z/@org/lib.slang:6:12
+ --> /tmp/tmp.tfCM1S9vkR/@org/lib.slang:6:12
   |
 6 | public int needs_caps() { return 42; }
   |            ^^^^^^^^^^
 --'
 note: see declaration of 'require'
- --> /tmp/tmp.DnkuEKtF6z/@org/lib.slang:5:2
+ --> /tmp/tmp.tfCM1S9vkR/@org/lib.slang:5:2
   |
 5 | [require(hlsl, _sm_6_5)]
   |  ^^^^^^^
@@ -59,12 +59,6 @@ EXIT     : 0
 
 ================================================================
 CASE     : capabilities/remove-require
-EXPECTED : passes
-ACTUAL   : passes    [ok]
-EXIT     : 0
-
-================================================================
-CASE     : capabilities/widen-spirv-version
 EXPECTED : passes
 ACTUAL   : passes    [ok]
 EXIT     : 0
@@ -126,7 +120,7 @@ error[E39999]: not enough arguments to call
   |            ^ not enough arguments to call (got 2, expected 3)
 --'
 note[E40011]: candidate: public func add(int, int, int) -> int
- --> /tmp/tmp.DnkuEKtF6z/@org/lib.slang:4:12
+ --> /tmp/tmp.tfCM1S9vkR/@org/lib.slang:4:12
   |
 4 | public int add(int x, int y, int z) { return x + y + z; }
   |            ^^^
@@ -164,7 +158,7 @@ error[E39999]: too many arguments to call
   |            ^ too many arguments to call (got 2, expected 1)
 --'
 note[E40011]: candidate: public func add(int) -> int
- --> /tmp/tmp.DnkuEKtF6z/@org/lib.slang:4:12
+ --> /tmp/tmp.tfCM1S9vkR/@org/lib.slang:4:12
   |
 4 | public int add(int x) { return x; }
   |            ^^^
@@ -202,13 +196,13 @@ ACTUAL   : breaks    [ok]
 EXIT     : 255
 ----------------------------------------------------------------
 error[E38100]: missing interface member
-  --> /tmp/tmp.DnkuEKtF6z/@org/lib.slang:21:24
+  --> /tmp/tmp.tfCM1S9vkR/@org/lib.slang:21:24
    |
 21 | public struct Square : IShape
    |                        ^^^^^^ type 'Square' does not provide required interface member 'Coord'
 ---'
 note: see declaration of 'Coord'
-  --> /tmp/tmp.DnkuEKtF6z/@org/lib.slang:17:20
+  --> /tmp/tmp.tfCM1S9vkR/@org/lib.slang:17:20
    |
 17 | associatedtype Coord;
    |                ^^^^^
@@ -228,13 +222,13 @@ ACTUAL   : breaks    [ok]
 EXIT     : 255
 ----------------------------------------------------------------
 error[E38100]: missing interface member
-  --> /tmp/tmp.DnkuEKtF6z/@org/lib.slang:21:24
+  --> /tmp/tmp.tfCM1S9vkR/@org/lib.slang:21:24
    |
 21 | public struct Square : IShape
    |                        ^^^^^^ type 'Square' does not provide required interface member 'perimeter'
 ---'
 note: see declaration of 'perimeter'
-  --> /tmp/tmp.DnkuEKtF6z/@org/lib.slang:18:9
+  --> /tmp/tmp.tfCM1S9vkR/@org/lib.slang:18:9
    |
 18 | int perimeter();
    |     ^^^^^^^^^
@@ -343,13 +337,13 @@ ACTUAL   : breaks    [ok]
 EXIT     : 255
 ----------------------------------------------------------------
 error[E30601]: visibility higher than parent
-  --> /tmp/tmp.DnkuEKtF6z/@org/lib.slang:10:16
+  --> /tmp/tmp.tfCM1S9vkR/@org/lib.slang:10:16
    |
 10 | public int x;
    |            ^ 'x' cannot have a higher visibility than 'Point'.
 ---'
 error[E30601]: visibility higher than parent
-  --> /tmp/tmp.DnkuEKtF6z/@org/lib.slang:11:16
+  --> /tmp/tmp.tfCM1S9vkR/@org/lib.slang:11:16
    |
 11 | public int y;
    |            ^ 'y' cannot have a higher visibility than 'Point'.
@@ -363,5 +357,5 @@ error[E39999]: import failed due to compilation error
 fatal error[E40003]: compilation ceased
 
 ================================================================
-TOTAL    : 30
+TOTAL    : 29
 SURPRISES: 1
