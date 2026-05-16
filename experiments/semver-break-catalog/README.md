@@ -52,17 +52,25 @@ The check happens at the entry-point boundary against the target.
 surface for the catalogue's purposes (function / generic / struct /
 interface / conformance), but it doesn't look like a real Slang
 library: there are no `__init` constructors, no `extension`s, no
-interface inheritance, no `where`-clause with multiple bounds. The
-generic `identity<T>(T x) { return x; }` is intentionally
-unconstrained because it's the test subject for
-`add-generic-constraint`; this is also legitimate Slang —
-`user-guide/06-interfaces-generics.md` L95 notes that a bare `<T>`
-fails to type-check only at any line that *accesses* a member of
-`T` (since the compiler can't verify the member exists without a
-constraint); `identity` never touches `T`'s API, so no constraint
-is needed. Real libraries usually do touch their generic type
-parameters, which is why bare `<T>` is rare in practice. The
-consumer's `Square sq1; sq1.side = 6;` pattern is similarly
+interface inheritance, no `where`-clause with multiple bounds, and
+no module-level `[require]` (real libraries would typically
+declare a module-level capability envelope via the
+`[require(...)] module foo;` pattern in
+`user-guide/05-capabilities.md` lines 80-92; the catalogue
+exercises `[require]` only at function level via the capability
+cases).
+
+`identity<T>(T x) { return x; }` is intentionally unconstrained
+because it's the test subject for `add-generic-constraint`. Slang's
+design point is constrained generics: per
+`user-guide/06-interfaces-generics.md` lines 95-97, omitting the
+constraint is explicitly positioned as the C++-template style Slang
+moved away from. Bare `<T>` compiles only in degenerate cases where
+the body never touches `T`'s API, which `identity` happens to
+satisfy; it's a contrived shape chosen for the constraint-mutation
+test, not an idiomatic example of a library function.
+
+The consumer's `Square sq1; sq1.side = 6;` pattern is similarly
 unidiomatic (idiomatic Slang would use a positional initializer
 or an `__init`) but chosen so the catalogue isolates named-field-
 access semantics from constructor semantics. See Limitations for
@@ -151,14 +159,11 @@ The most consequential finding: **adding an interface method with a
 default implementation is non-breaking** under the catalogue's
 conditions. Conforming types fall back to the default; the library
 compiles and the consumer is unaffected. The user-guide flags one
-wrinkle this catalogue doesn't exercise: if a conforming type already
-has a method with the same name and signature, that method must now
-be explicitly marked `override` — the keyword is a required marker
-that the conformer is intentionally providing its own implementation
-of the interface requirement, not a disambiguator
-(`user-guide/06-interfaces-generics.md` lines 49-70). Within that
-constraint, default-method additions are a real affordance for
-non-major bumps.
+wrinkle this catalogue doesn't exercise: if a conforming type
+already has a method with the same name and signature, that method
+must now be marked `override` (`user-guide/06-interfaces-generics.md`
+lines 49-70). Within that constraint, default-method additions are
+a real affordance for non-major bumps.
 
 Adding a method *without* a default breaks differently: the library
 itself fails to compile because the existing conforming type doesn't
@@ -248,16 +253,18 @@ The probe classifies digest verdicts against each case's ACTUAL
 | `-dump-module` (IR disassembly)  | 13 | 3      | 12   | **1** |
 | `.slang-module` (serialised mod.)| 12 | 3      | 14   | 0    |
 
-`.slang-module` is the on-disk binary serialisation of a Slang
-*module*, which contains the IR plus module metadata (the source
-path the probe has to strip is one such metadatum;
-`user-guide/08-compiling.md` L57-58 names this form). `-dump-module`
-is disassembly of the IR section only
-(`command-line-slangc-reference.md`: "Disassemble and print the
-module IR"), which is why it omits things the IR has but the
-disassembler doesn't print — notably `[require]` capability
-annotations. The MISS finding below is a structural property of
-that asymmetry, not a surprise.
+`.slang-module` is the binary serialisation form named in
+`user-guide/08-compiling.md` lines 57-58 ("The compiled module can
+then be serialized to a `.slang-module` binary file"). The file's
+contents aren't fully specified in the docs; the probe observes two
+relevant properties empirically: (a) the file embeds the source
+path the caller passed to `slangc` (the probe stages each case as
+`canonical.slang` to make hashes path-independent), and (b) it
+appears to carry `[require]` annotations that `-dump-module` does
+not print — the cross-target-require case produces a distinct
+file-hash from baseline while its disassembly is byte-identical.
+The MISS finding below is therefore an empirical asymmetry between
+the two artifacts, not a documented contract.
 
 `MISS` is the dangerous outcome — a digest that's "same" when the
 consumer actually breaks would let a major change slip through as a
@@ -313,9 +320,10 @@ generic parameter names, internal symbols). That's a tractable next
 step, conditional on a wider catalogue not surfacing further blind
 spots that change the requirements.
 
-Also noted: the binary `.slang-module` embeds the absolute path of
-the source file. The probe stages each source as a canonical filename
-before compiling; any production tool that hashes the binary would
+Also noted: the binary `.slang-module` embeds the source path that
+`slangc` was invoked with. The probe stages each source as a
+canonical filename before compiling so the hashes are
+path-independent; any production tool that hashes the binary would
 need the same workaround (or a strip-path post-process).
 
 **Precompile invocation.** The probe precompiles each case via
@@ -419,8 +427,9 @@ compilation target," not as a general semver classification.
 
 - **Mutation gaps.** Categories arguably belonging in a full
   "what's breaking?" study but not exercised here: `inout`/`out`
-  parameter mutability, free-function ↔ method moves, `extension`
-  add/remove, operator overloads (`__init`, `operator+`),
+  parameter mutability, adding or removing an `extension`,
+  moving a function in or out of an `extension`,
+  operator overloads (`__init`, `operator+`),
   `enum` cases (add/remove/reorder), attributes other than `[require]`
   (`[mutating]`, `[ForceInline]`), removing an overload from a set
   the consumer relies on, default values for generic type-args,
