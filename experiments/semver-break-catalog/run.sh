@@ -48,10 +48,15 @@ run_case() {
 
   cp -f "${case_dir}/lib.slang" "${STAGE_DIR}/@org/lib.slang"
 
+  local consumer="${HERE}/consumer.slang"
+  if [[ -f "${case_dir}/consumer.slang" ]]; then
+    consumer="${case_dir}/consumer.slang"
+  fi
+
   local out
   out="$("${SLANGC}" -target spirv -stage compute -entry main \
     -I "${STAGE_DIR}" -o "${STAGE_DIR}/out.spv" \
-    "${HERE}/consumer.slang" 2>&1)"
+    "${consumer}" 2>&1)"
   local rc=$?
   rm -f "${STAGE_DIR}/out.spv"
 
