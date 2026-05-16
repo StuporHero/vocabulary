@@ -1,5 +1,5 @@
 Slang semver-break catalogue
-Date  : 2026-05-16T19:55:40Z
+Date  : 2026-05-16T19:57:01Z
 Slangc: 2026.8.1
 
 ================================================================
@@ -46,7 +46,7 @@ error[E39999]: not enough arguments to call
   |            ^ not enough arguments to call (got 2, expected 3)
 --'
 note[E40011]: candidate: public func add(int, int, int) -> int
- --> /tmp/tmp.ljA4RouPTx/@org/lib.slang:4:12
+ --> /tmp/tmp.oYTtmn55Fq/@org/lib.slang:4:12
   |
 4 | public int add(int x, int y, int z) { return x + y + z; }
   |            ^^^
@@ -84,7 +84,7 @@ error[E39999]: too many arguments to call
   |            ^ too many arguments to call (got 2, expected 1)
 --'
 note[E40011]: candidate: public func add(int) -> int
- --> /tmp/tmp.ljA4RouPTx/@org/lib.slang:4:12
+ --> /tmp/tmp.oYTtmn55Fq/@org/lib.slang:4:12
   |
 4 | public int add(int x) { return x; }
   |            ^^^
@@ -116,5 +116,88 @@ error[E30015]: undefined identifier
 --'
 
 ================================================================
-TOTAL    : 11
+CASE     : types/add-field
+EXPECTED : passes
+ACTUAL   : passes    [ok]
+EXIT     : 0
+
+================================================================
+CASE     : types/change-field-type
+EXPECTED : passes
+ACTUAL   : passes    [ok]
+EXIT     : 0
+
+================================================================
+CASE     : types/field-public-to-internal
+EXPECTED : breaks
+ACTUAL   : breaks    [ok]
+EXIT     : 255
+----------------------------------------------------------------
+error[E30600]: declaration not accessible
+  --> /home/user/vocabulary/experiments/semver-break-catalog/consumer.slang:11:7
+   |
+11 | p.x = 4;
+   |   ^ 'x' is not accessible from the current context.
+---'
+
+================================================================
+CASE     : types/remove-field
+EXPECTED : breaks
+ACTUAL   : breaks    [ok]
+EXIT     : 255
+----------------------------------------------------------------
+error[E30027]: member not found
+  --> /home/user/vocabulary/experiments/semver-break-catalog/consumer.slang:12:7
+   |
+12 | p.y = 5;
+   |   ^ 'y' is not a member of 'Point'.
+---'
+
+================================================================
+CASE     : types/rename-field
+EXPECTED : breaks
+ACTUAL   : breaks    [ok]
+EXIT     : 255
+----------------------------------------------------------------
+error[E30027]: member not found
+  --> /home/user/vocabulary/experiments/semver-break-catalog/consumer.slang:11:7
+   |
+11 | p.x = 4;
+   |   ^ 'x' is not a member of 'Point'.
+---'
+
+================================================================
+CASE     : types/reorder-fields
+EXPECTED : passes
+ACTUAL   : passes    [ok]
+EXIT     : 0
+
+================================================================
+CASE     : types/type-public-to-internal
+EXPECTED : breaks
+ACTUAL   : breaks    [ok]
+EXIT     : 255
+----------------------------------------------------------------
+error[E30601]: visibility higher than parent
+  --> /tmp/tmp.oYTtmn55Fq/@org/lib.slang:10:16
+   |
+10 | public int x;
+   |            ^ 'x' cannot have a higher visibility than 'Point'.
+---'
+error[E30601]: visibility higher than parent
+  --> /tmp/tmp.oYTtmn55Fq/@org/lib.slang:11:16
+   |
+11 | public int y;
+   |            ^ 'y' cannot have a higher visibility than 'Point'.
+---'
+error[E39999]: import failed due to compilation error
+ --> /home/user/vocabulary/experiments/semver-break-catalog/consumer.slang:1:8
+  |
+1 | import "@org/lib";
+  |        ^^^^^^^^^^ import of module '@org/lib' failed because of a compilation error
+--'
+fatal error[E40003]: compilation ceased
+
+================================================================
+TOTAL    : 18
 SURPRISES: 1
