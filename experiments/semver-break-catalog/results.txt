@@ -1,5 +1,5 @@
 Slang semver-break catalogue
-Date  : 2026-05-16T19:57:01Z
+Date  : 2026-05-16T19:58:22Z
 Slangc: 2026.8.1
 
 ================================================================
@@ -7,6 +7,25 @@ CASE     : baseline/control
 EXPECTED : passes
 ACTUAL   : passes    [ok]
 EXIT     : 0
+
+================================================================
+CASE     : conformances/add-conformance-elsewhere
+EXPECTED : passes
+ACTUAL   : passes    [ok]
+EXIT     : 0
+
+================================================================
+CASE     : conformances/remove-conformance
+EXPECTED : breaks
+ACTUAL   : breaks    [ok]
+EXIT     : 255
+----------------------------------------------------------------
+error[E38029]: type argument doesn't conform to interface
+  --> /home/user/vocabulary/experiments/semver-break-catalog/consumer.slang:20:13
+   |
+20 | int t = total_area<Square>(sq1, sq2);
+   |         ^^^^^^^^^^ type argument 'Square' does not conform to the required interface 'IShape'
+---'
 
 ================================================================
 CASE     : functions/add-generic-constraint
@@ -46,7 +65,7 @@ error[E39999]: not enough arguments to call
   |            ^ not enough arguments to call (got 2, expected 3)
 --'
 note[E40011]: candidate: public func add(int, int, int) -> int
- --> /tmp/tmp.oYTtmn55Fq/@org/lib.slang:4:12
+ --> /tmp/tmp.cHYpJk3lvo/@org/lib.slang:4:12
   |
 4 | public int add(int x, int y, int z) { return x + y + z; }
   |            ^^^
@@ -84,7 +103,7 @@ error[E39999]: too many arguments to call
   |            ^ too many arguments to call (got 2, expected 1)
 --'
 note[E40011]: candidate: public func add(int) -> int
- --> /tmp/tmp.oYTtmn55Fq/@org/lib.slang:4:12
+ --> /tmp/tmp.cHYpJk3lvo/@org/lib.slang:4:12
   |
 4 | public int add(int x) { return x; }
   |            ^^^
@@ -114,6 +133,90 @@ error[E30015]: undefined identifier
 7 | int s = add(1, 2);
   |         ^^^ undefined identifier 'add'.
 --'
+
+================================================================
+CASE     : interfaces/add-associated-type
+EXPECTED : breaks
+ACTUAL   : breaks    [ok]
+EXIT     : 255
+----------------------------------------------------------------
+error[E38100]: missing interface member
+  --> /tmp/tmp.cHYpJk3lvo/@org/lib.slang:21:24
+   |
+21 | public struct Square : IShape
+   |                        ^^^^^^ type 'Square' does not provide required interface member 'Coord'
+---'
+note: see declaration of 'Coord'
+  --> /tmp/tmp.cHYpJk3lvo/@org/lib.slang:17:20
+   |
+17 | associatedtype Coord;
+   |                ^^^^^
+---'
+error[E39999]: import failed due to compilation error
+ --> /home/user/vocabulary/experiments/semver-break-catalog/consumer.slang:1:8
+  |
+1 | import "@org/lib";
+  |        ^^^^^^^^^^ import of module '@org/lib' failed because of a compilation error
+--'
+fatal error[E40003]: compilation ceased
+
+================================================================
+CASE     : interfaces/add-method-no-default
+EXPECTED : breaks
+ACTUAL   : breaks    [ok]
+EXIT     : 255
+----------------------------------------------------------------
+error[E38100]: missing interface member
+  --> /tmp/tmp.cHYpJk3lvo/@org/lib.slang:21:24
+   |
+21 | public struct Square : IShape
+   |                        ^^^^^^ type 'Square' does not provide required interface member 'perimeter'
+---'
+note: see declaration of 'perimeter'
+  --> /tmp/tmp.cHYpJk3lvo/@org/lib.slang:18:9
+   |
+18 | int perimeter();
+   |     ^^^^^^^^^
+---'
+error[E39999]: import failed due to compilation error
+ --> /home/user/vocabulary/experiments/semver-break-catalog/consumer.slang:1:8
+  |
+1 | import "@org/lib";
+  |        ^^^^^^^^^^ import of module '@org/lib' failed because of a compilation error
+--'
+fatal error[E40003]: compilation ceased
+
+================================================================
+CASE     : interfaces/add-method-with-default
+EXPECTED : passes
+ACTUAL   : passes    [ok]
+EXIT     : 0
+
+================================================================
+CASE     : interfaces/change-method-return-type
+EXPECTED : passes
+ACTUAL   : passes    [ok]
+EXIT     : 0
+----------------------------------------------------------------
+warning[E30081]: implicit conversion not recommended
+  --> /home/user/vocabulary/experiments/semver-break-catalog/consumer.slang:19:21
+   |
+19 | int a = sq1.area();
+   |                 ^ implicit conversion from 'float' to 'int' is not recommended
+---'
+
+================================================================
+CASE     : interfaces/rename-method
+EXPECTED : breaks
+ACTUAL   : breaks    [ok]
+EXIT     : 255
+----------------------------------------------------------------
+error[E30027]: member not found
+  --> /home/user/vocabulary/experiments/semver-break-catalog/consumer.slang:19:17
+   |
+19 | int a = sq1.area();
+   |             ^^^^ 'area' is not a member of 'Square'.
+---'
 
 ================================================================
 CASE     : types/add-field
@@ -179,13 +282,13 @@ ACTUAL   : breaks    [ok]
 EXIT     : 255
 ----------------------------------------------------------------
 error[E30601]: visibility higher than parent
-  --> /tmp/tmp.oYTtmn55Fq/@org/lib.slang:10:16
+  --> /tmp/tmp.cHYpJk3lvo/@org/lib.slang:10:16
    |
 10 | public int x;
    |            ^ 'x' cannot have a higher visibility than 'Point'.
 ---'
 error[E30601]: visibility higher than parent
-  --> /tmp/tmp.oYTtmn55Fq/@org/lib.slang:11:16
+  --> /tmp/tmp.cHYpJk3lvo/@org/lib.slang:11:16
    |
 11 | public int y;
    |            ^ 'y' cannot have a higher visibility than 'Point'.
@@ -199,5 +302,5 @@ error[E39999]: import failed due to compilation error
 fatal error[E40003]: compilation ceased
 
 ================================================================
-TOTAL    : 18
+TOTAL    : 25
 SURPRISES: 1
