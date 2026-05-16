@@ -103,7 +103,7 @@ Re-run with `bash experiments/semver-break-catalog/run.sh` and
 
 ## Findings — surface mutations
 
-### Functions (`fecf74a`)
+### Functions
 
 | case | expected | actual |
 | ---- | -------- | ------ |
@@ -124,7 +124,7 @@ failing. Parameter names and generic-parameter names are not part of
 the ABI as far as slangc cares — renames in either are invisible to
 the consumer.
 
-### Types (`68a01d4`)
+### Types
 
 | case | expected | actual |
 | ---- | -------- | ------ |
@@ -143,7 +143,7 @@ obviously changes, which is a separate ABI question outside source
 semver. The int→float field change passes silently (no warning),
 mirroring the function-level finding.
 
-### Interfaces + conformances (`ac6c146`)
+### Interfaces + conformances
 
 | case | expected | actual |
 | ---- | -------- | ------ |
@@ -197,7 +197,7 @@ calls into two ambiguous candidates. The claim is narrower than that:
 adding a new type and its conformance leaves untouched code
 untouched.)
 
-## Findings — capability mutations (`ae44dab`, with `widen-spirv-version` dropped in `ab5cbbc`)
+## Findings — capability mutations
 
 | case | expected | actual |
 | ---- | -------- | ------ |
@@ -242,7 +242,7 @@ note: see definition of 'needs_caps' ...
 The diagnostic chain (entry point → call site → declaration) is
 exactly the structure a publish-time tool would want.
 
-## Findings — secondary probe (`28f948f`, classification fixed in `4474455`)
+## Findings — secondary probe
 
 Two candidate existing digest sources tested against the 29 cases.
 The probe classifies digest verdicts against each case's ACTUAL
@@ -449,9 +449,10 @@ compilation target," not as a general semver classification.
 
 - **Prediction calibration.** Each case has an `EXPECTED` outcome
   that was authored before the case's category was run. Categories
-  were added incrementally (commits `fecf74a` → `68a01d4` → `ac6c146`
-  → `ae44dab`), so predictions in later batches were informed by
-  findings in earlier ones. Specifically: the function-level run
+  were added incrementally (functions → types → interfaces/
+  conformances → capabilities), so predictions in later batches
+  were informed by findings in earlier ones. Specifically: the
+  function-level run
   surfaced the int→float warning surprise (`change-return-type`
   predicted breaks, actually passes); the type-level
   (`change-field-type`) and interface-level (`change-method-return-type`)
