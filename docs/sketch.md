@@ -95,11 +95,13 @@ Each design dimension below uses this template:
 
 **Problem.** How is a package named and versioned?
 
-**Slang wrinkle.** Slang module names are flat identifiers (`import foo;`).
-The package name and the module name need not be the same, but mapping rules
-must be unambiguous. Public API surface includes generics, interfaces, and
-associated types — small textual changes can be ABI-breaking even when they
-look additive.
+**Slang wrinkle.** Slang's import surface admits two flavors: identifier-form
+(`import foo;`) and string-form (`import "@ns/foo";`). Empirically the
+linker keys module identity on the full string, so a scoped name like
+`@nvidia/math` is a real identity rather than file-naming sugar (see
+`experiments/module-name-identity/`). Public API surface includes
+generics, interfaces, and associated types — small textual changes can
+be ABI-breaking even when they look additive.
 
 **Options.**
 
@@ -112,7 +114,40 @@ look additive.
 - **D. Hybrid: semver in manifest, content digest in lockfile.** Layer on
   top of A/B/C. Probably required regardless of which name scheme wins.
 
-**Open questions.**
+**Decision (naming): B, used at every layer.** The registry-published
+identifier is a scoped name (`@org/pkg`), and the same string is the
+Slang module identity verbatim:
+
+```toml
+# manifest
+name = "@nvidia/math"
+```
+
+```slang
+// primary file
+module "@nvidia/math";
+```
+
+```slang
+// consumer
+import "@nvidia/math";
+```
+
+No separate "registry name → Slang module name" mapping. Provenance is
+visible at every call site, and packages from different scopes can never
+collide on identity by construction.
+
+Flat unscoped module names remain *permitted* (a single-author package
+can still declare `module foo_bar;` and `import foo_bar;`), but the
+registry guarantees uniqueness only within the scoped namespace —
+collisions on unscoped names are the author's problem.
+
+Option C is rejected: the experiment showed Slang would accept
+URL-shaped string imports too, but they're structurally identical to B
+with a hostname tax that couples identity to a hoster for no extra
+benefit. Option D layers on top of B unchanged.
+
+**Open questions** (versioning sub-decision, still unresolved).
 
 - How does semver map onto Slang's surface? Proposal: a Slang-aware
   *signature digest* (over public functions, generic parameters, interface
@@ -392,7 +427,7 @@ escape hatch.
 
 | Dimension                           | Options on the table        | Must decide before code | Deferred until            |
 | ----------------------------------- | --------------------------- | ----------------------- | ------------------------- |
-| 3.1 Identity & versioning           | flat / scoped / URL + semver | **yes**                | —                         |
+| 3.1 Identity & versioning           | naming: scoped at every layer (decided); semver semantics: open | naming: done; semver: **yes** | — |
 | 3.2 Manifest format & fields        | TOML / JSON / Slang-native  | **yes**                | —                         |
 | 3.3 Source vs. precompiled          | source / artifact / hybrid  | **yes**                | —                         |
 | 3.4 Compiler / target / cap matrix  | surface declared DNF / expand to explicit matrix | no | after 3.3 |
