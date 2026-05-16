@@ -1,3 +1,8 @@
+// String-form module name with a scope prefix. Slang's user-guide
+// permits this (`user-guide/04-modules-and-access-control.md`,
+// "module" / "import" syntax) and the prior module-name-identity
+// experiment confirmed it's a real identity at link time. The shape
+// matches the registry naming decided in docs/sketch.md §3.1.
 module "@org/lib";
 
 public int add(int x, int y) { return x + y; }

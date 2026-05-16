@@ -46,8 +46,12 @@ need a `[require]`-gated call site.
 **Compilation scope.** Every case compiles to `-target spirv -stage
 compute` under slangc's default profile. Capability findings in
 particular are defined by the target; a glsl- or hlsl-bound consumer
-might flip individual outcomes. Read all "within-family /
-cross-family" claims as scoped to a spirv-compute consumer.
+might flip individual outcomes. Slang's capability docs (`user-guide
+ch. 5`) describe mutually-exclusive capability groups — target atoms
+(`hlsl`, `glsl`, `spirv`, `metal`, `wgsl`, `cuda`, `cpp`) are one
+such group; stage atoms (`vertex`, `fragment`, `compute`, …) are
+another. The catalogue's capability findings are scoped to a
+spirv-compute consumer.
 
 Re-run with `bash experiments/semver-break-catalog/run.sh` and
 `bash experiments/semver-break-catalog/probe-dump-module.sh`.
@@ -107,18 +111,24 @@ mirroring the function-level finding.
 | add-conformance-elsewhere     | passes | passes |
 
 The most consequential finding: **adding an interface method with a
-default implementation is non-breaking**. Conforming types don't need
-to override; the library compiles and the consumer is unaffected.
-Slang's interface evolution story is genuinely friendly to
-minor-version additions.
+default implementation is non-breaking** under the catalogue's
+conditions. Conforming types fall back to the default; the library
+compiles and the consumer is unaffected. The user-guide flags one
+wrinkle this catalogue doesn't exercise: if a conforming type already
+has a method with the same name and signature, that type now needs
+an explicit `override` keyword to disambiguate
+(`user-guide/06-interfaces-generics.md` §"Default Methods"). Within
+that constraint, default-method additions are a real affordance for
+non-major bumps.
 
-Adding a method *without* a default, or adding an associated type
-without one, breaks differently: the library itself fails to compile
-because the existing conforming type doesn't satisfy the new
-requirement. The consumer's `import` then fails with
-`error[E39999]: import failed due to compilation error`. A publish-
-time tool has to compile the library, not just diff its surface, to
-catch this.
+Adding a method *without* a default breaks differently: the library
+itself fails to compile because the existing conforming type doesn't
+satisfy the new requirement. Adding an associated type behaves the
+same way — Slang has no associated-type analogue of method defaults,
+so every conforming type must provide a binding. The consumer's
+`import` then fails with `error[E39999]: import failed due to
+compilation error`. A publish-time tool has to compile the library,
+not just diff its surface, to catch this.
 
 `change-method-return-type` is not an independent data point: the
 consumer calls `sq1.area()` directly on the concrete `Square`, so the
@@ -146,15 +156,16 @@ review: its EXPECTED was authored without a clear a-priori prediction
 — the lib.slang comment said "outcome depends ... recording the
 empirical answer" — so it didn't count as a real test.)
 
-Within-family adjustments (removing the `[require]`, narrowing from
-`spirv_1_3` to `spirv_1_0`) are non-breaking for the spirv-compute
-consumer under slangc's default profile. The catalogue does **not**
-cover widening within the same family or cross-target widening to a
-family the consumer's target already implies; either case might
-behave differently.
+Removing the `[require]` and narrowing within the same target atom
+lineage (`spirv_1_3` → `spirv_1_0`) are non-breaking for the
+spirv-compute consumer under slangc's default profile. The catalogue
+does **not** cover widening within that lineage or adding a
+requirement whose target the consumer's profile already implies;
+either could behave differently.
 
-Switching to a different target family (`spirv_1_3` → `hlsl + _sm_6_5`)
-breaks the spirv consumer with a precise diagnostic:
+Switching to a conflicting target atom (`spirv_1_3` → `hlsl + sm_6_5`,
+across the target mutually-exclusive group) breaks the spirv consumer
+with a precise diagnostic:
 
 ```
 error[E36107]: unavailable features in entry point
@@ -185,7 +196,7 @@ consumer actually breaks would let a major change slip through as a
 minor bump. The text dump misses one case in the catalogue:
 `capabilities/cross-target-require`. Verified manually: the dump for
 `[require(spirv_1_3)]` is byte-identical to the dump for
-`[require(hlsl, _sm_6_5)]`. The text disassembly strips capability
+`[require(hlsl, sm_6_5)]`. The text disassembly strips capability
 annotations entirely.
 
 The binary `.slang-module` produces no false negatives in this
@@ -265,14 +276,17 @@ invocations is not tested here.
    - **Breaking by signature** — function/method rename, required
      parameter add, remove, type/field rename or remove, visibility
      demotion, conformance removal, interface method add without
-     default, associated type add without default, generic constraint
-     tightening.
-   - **Breaking by capability** — cross-target-family switch in a
-     `[require]` declaration.
+     default, associated-type add (associated types have no
+     default-binding equivalent of method defaults), generic
+     constraint tightening.
+   - **Breaking by capability** — switching to a conflicting atom in
+     a mutually-exclusive group (e.g. spirv → hlsl in the target
+     group) inside a `[require]` declaration.
    - **Conditionally additive** — add field, reorder fields, add
      overload, add interface method *with* default, add conformance
-     for a new type, parameter/generic-param rename, within-family
-     `[require]` narrowing/removal. These passed under the catalogue's
+     for a new type, parameter/generic-param rename, narrowing within
+     the same target-atom lineage and removing a `[require]` entirely.
+     These passed under the catalogue's
      consumer; some are conditionally safe under specific access
      patterns (e.g. add-field and reorder-fields rely on named field
      access — a positional-init consumer would flip both).
@@ -324,7 +338,7 @@ compilation target," not as a general semver classification.
 - **Single compilation target.** All cases compile to `-target spirv
   -stage compute`. The capability findings depend on the default
   spirv profile; a glsl, hlsl, or metal consumer might flip the
-  within-family vs cross-family classification.
+  same-group vs cross-group classification of `[require]` changes.
 
 - **Mutation gaps.** Categories arguably belonging in a full
   "what's breaking?" study but not exercised here: `inout`/`out`
@@ -401,5 +415,6 @@ strengthen the catalogue's claims rather than merely extend them:
 
 3. **Multi-target sweep on capabilities.** Re-run the capability
    cases under at least one additional `-target` (glsl or hlsl),
-   since the within-family / cross-family taxonomy is defined by the
+   since the same-group / cross-group classification of `[require]`
+   changes depends on the
    target.

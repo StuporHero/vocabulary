@@ -1,5 +1,5 @@
 Slang semver-break catalogue
-Date  : 2026-05-16T21:06:01Z
+Date  : 2026-05-16T21:21:38Z
 Slangc: 2026.8.1
 
 ================================================================
@@ -20,12 +20,6 @@ EXPECTED : breaks
 ACTUAL   : breaks    [ok]
 EXIT     : 255
 ----------------------------------------------------------------
-warning[E36113]: using internal capability name
-  --> <STAGE>/@org/lib.slang:11:2
-   |
-11 | [require(hlsl, _sm_6_5)]
-   |  ^^^^^^^ '_sm_6_5' resolves into a '_Internal' '__sm_6_5' Capability, use '_sm_6_5' instead.
----'
 error[E36107]: unavailable features in entry point
  --> cases/capabilities/cross-target-require/consumer.slang:5:6
   |
@@ -39,17 +33,17 @@ note: see using of 'needs_caps'
   |         ^^^^^^^^^^
 --'
 note: see definition of 'needs_caps'
-  --> <STAGE>/@org/lib.slang:12:12
-   |
-12 | public int needs_caps() { return 42; }
-   |            ^^^^^^^^^^
----'
+ --> <STAGE>/@org/lib.slang:8:12
+  |
+8 | public int needs_caps() { return 42; }
+  |            ^^^^^^^^^^
+--'
 note: see declaration of 'require'
-  --> <STAGE>/@org/lib.slang:11:2
-   |
-11 | [require(hlsl, _sm_6_5)]
-   |  ^^^^^^^
----'
+ --> <STAGE>/@org/lib.slang:7:2
+  |
+7 | [require(hlsl, sm_6_5)]
+  |  ^^^^^^^
+--'
 
 ================================================================
 CASE     : capabilities/narrow-require
