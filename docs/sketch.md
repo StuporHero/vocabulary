@@ -150,7 +150,16 @@ keywords          = [...]
 slang.min_version = ">=2025.1"        # compiler range
 slang.max_version = "<2026.0"
 targets           = ["hlsl", "spirv", "metal"]   # what the package supports
-capabilities      = ["sm_6_5", "raytracing"]     # what the package requires
+
+# Slang capability requirements, in disjunction-of-conjunctions form.
+# Atom names are Slang's own (see shader-slang/slang docs/user-guide/05-capabilities.md);
+# each inner list is AND'd, outer list is OR'd. Mirrors the shape of multiple
+# `[require(...)]` attributes on a Slang function.
+capabilities      = [
+  ["hlsl", "_sm_6_5"],
+  ["spirv_1_4", "SPV_KHR_ray_tracing"],
+]
+
 entry_points      = [ { name = "main_cs", stage = "compute" }, ... ]
 exports.interfaces = ["IBRDF", "ISampler"]
 
@@ -204,19 +213,31 @@ ignore it.
 **Problem.** How does the index advertise which profiles a package version
 supports?
 
+**Slang wrinkle.** Capability satisfaction is not the registry's job. Slang
+itself enforces `[require(...)]` declarations at type-check time, with an
+implication lattice that handles subsumption automatically (`_sm_6_5` implies
+`_sm_6_0`, `spvShaderClockKHR` implies `SPV_KHR_shader_clock` implies
+`spirv_1_0`, etc.) and a DNF normal form across multiple `[require]`
+attributes on a function. The registry's role is narrower: surface the
+**author-declared capability DNF** in the index so the resolver can fail
+fast on obvious mismatches before `slangc` is even invoked. Don't
+re-implement Slang's satisfaction logic in the resolver.
+
 **Options.**
 
-- **A. Sparse explicit matrix.** Index entry lists every supported
-  `(compiler, target, caps)` tuple. Precise; verbose; brittle across
-  compiler releases.
-- **B. Declared support ranges.** Author writes `targets = [...]`,
-  `slang.min_version`, `capabilities = [...]`; the index advertises the
-  declared range and lets the resolver intersect.
-- **C. Build-on-demand.** Registry has a build farm; resolver requests a
-  profile and the farm builds-or-caches. Heavyweight; defer indefinitely.
+- **A. Surface the declared DNF as-is.** Index entry stores the same
+  disjunction-of-conjunctions the manifest declared. Resolver checks that
+  at least one clause is target-compatible with the consumer; final
+  satisfaction is `slangc`'s problem. Cheapest; matches Slang's model.
+- **B. Expand to explicit (compiler, target, caps) tuples.** Pre-compute
+  every supported profile and store the cross-product. Precise but verbose
+  and brittle across compiler releases.
+- **C. Build-on-demand.** Build farm produces artifacts per requested
+  profile. Heavyweight; presupposes artifact-canonical distribution (3.3);
+  defer indefinitely.
 
 **Tag.** Deferred until 3.3 lands. If 3.3 = source-only or source-canonical,
-option B suffices.
+option A is the obvious choice — Slang already does the hard work.
 
 ---
 
@@ -225,9 +246,12 @@ option B suffices.
 **Problem.** Given a root manifest, produce a concrete, reproducible set of
 package versions.
 
-**Slang wrinkle.** Two extra axes flow through the graph: required Slang
-compiler version (intersect across the graph), and required capabilities
-(union — the consuming pipeline must satisfy the union).
+**Slang wrinkle.** One extra axis flows through the graph: required Slang
+compiler version (intersect across the graph). Capability requirements
+*don't* need to be combined by the resolver — Slang's own `[require]`
+type-checking (3.4) handles cross-module satisfaction. The resolver only
+needs to verify, per package, that at least one declared DNF clause is
+target-compatible with the consumer's profile.
 
 **Options.**
 
@@ -367,7 +391,7 @@ escape hatch.
 | 3.1 Identity & versioning           | flat / scoped / URL + semver | **yes**                | —                         |
 | 3.2 Manifest format & fields        | TOML / JSON / Slang-native  | **yes**                | —                         |
 | 3.3 Source vs. precompiled          | source / artifact / hybrid  | **yes**                | —                         |
-| 3.4 Compiler / target / cap matrix  | sparse / ranges / on-demand | no                      | after 3.3                 |
+| 3.4 Compiler / target / cap matrix  | surface declared DNF / expand to explicit matrix | no | after 3.3 |
 | 3.5 Resolver + lockfile             | MVS / SAT / PubGrub         | no                      | after 3.1 + 3.2           |
 | 3.6 Registry architecture           | git / API / CDN / OCI       | **yes**                | —                         |
 | 3.7 Publishing & auth               | tokens / org / Sigstore     | no                      | after 3.6                 |
@@ -402,8 +426,9 @@ tarball, signature)` to the index. The index is a git repo; her token gives
 her commit access to the `disney-brdf/` namespace.
 
 > **Gap surfaced:** what does "validate against the declared targets" mean
-> if the manifest declares only ranges (3.4 option B)? Probably: compile
-> against the *minimum* declared compiler version for each target.
+> if the manifest declares only a DNF (3.4 option A) rather than an explicit
+> matrix? Probably: compile one canonical clause per declared target against
+> the *minimum* declared compiler version.
 
 ### 6.2 Consume from a Vulkan engine
 
@@ -414,7 +439,7 @@ name              = "my-engine-shaders"
 version           = "0.0.0"
 slang.min_version = ">=2025.2"
 targets           = ["spirv"]
-capabilities      = ["sm_6_5"]
+capabilities      = [["spirv_1_4", "_sm_6_5"]]
 dependencies      = { "disney-brdf" = "^0.3", "envmap-sampling" = "^1.1" }
 ```
 
@@ -424,11 +449,17 @@ into `.slang-deps/`. `slangpm export --format=cmake` emits
 resolves. The engine's CMake includes this file and links a `Slang::deps`
 INTERFACE target.
 
-> **Gap surfaced:** capability intersection — if `disney-brdf` declares
-> `capabilities = []` and the consumer declares `["sm_6_5"]`, the union is
-> `["sm_6_5"]`. Easy. Harder case: `envmap-sampling` declares
-> `["wave_ops"]` and the consumer's `targets = ["wgsl"]`, which doesn't
-> support wave ops. Resolver must error with a clear message.
+> **Gap surfaced:** capability gating, not intersection. A package with no
+> declared `capabilities` is capability-neutral — its public symbols carry
+> their own `[require]` declarations and `slangc` checks them at compile
+> time. The resolver's job is to verify that *at least one* clause of each
+> dependency's declared DNF is compatible with the consumer's target/profile
+> set. Example: `envmap-sampling` declares
+> `[["hlsl", "_sm_6_5", "waveops"], ["spirv_1_4", "waveops"]]` and the
+> consumer's `targets = ["wgsl"]`. No clause is wgsl-compatible — resolver
+> rejects with a message naming the package, the consumer's target, and
+> the (target-incompatible) declared clauses. Final per-call-site
+> satisfaction is still slangc's responsibility.
 
 ### 6.3 Pin across a Slang compiler upgrade
 
@@ -462,7 +493,12 @@ repository        = "https://github.com/example/envmap-sampling"
 slang.min_version = ">=2025.2"
 slang.max_version = "<2027.0"
 targets           = ["hlsl", "spirv", "metal", "wgsl"]
-capabilities      = []
+capabilities      = [
+  ["hlsl", "_sm_6_2"],
+  ["spirv_1_3"],
+  ["metal"],
+  ["wgsl"],
+]
 
 exports.interfaces = ["IEnvmapSampler"]
 
@@ -485,7 +521,12 @@ multiscatter = []
   "cksum": "sha256:0d2c…",
   "slang": { "min": "2025.2", "max": "<2027.0" },
   "targets": ["hlsl", "spirv", "metal", "wgsl"],
-  "capabilities": [],
+  "capabilities": [
+    ["hlsl", "_sm_6_2"],
+    ["spirv_1_3"],
+    ["metal"],
+    ["wgsl"]
+  ],
   "yanked": false
 }
 ```
