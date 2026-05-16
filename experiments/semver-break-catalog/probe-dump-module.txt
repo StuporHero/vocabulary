@@ -1,5 +1,5 @@
 Slang -dump-module probe
-Date  : 2026-05-16T21:45:06Z
+Date  : 2026-05-16T22:38:17Z
 
 Step 1a. Stability of -dump-module text: same baseline compiled twice.
   hash 1: 7edae499d79a0098111ea2158789881d5e826efaa08a9a0f4ed1188f29efd64c
@@ -7,8 +7,8 @@ Step 1a. Stability of -dump-module text: same baseline compiled twice.
   -> STABLE: hashes match across runs.
 
 Step 1b. Stability of binary .slang-module: same baseline compiled twice.
-  hash 1: 0145eda710b6eaea8e82b8a0b28377b0a4e9afd38cdf3ae79522685608b06f58
-  hash 2: 0145eda710b6eaea8e82b8a0b28377b0a4e9afd38cdf3ae79522685608b06f58
+  hash 1: 1c560b3d8b2e91995d015cfd7651a6ef07c34b54428973698e03ff800831f013
+  hash 2: 1c560b3d8b2e91995d015cfd7651a6ef07c34b54428973698e03ff800831f013
   -> STABLE: binary hashes match across runs.
 
 Step 2. Per-case digest vs baseline.

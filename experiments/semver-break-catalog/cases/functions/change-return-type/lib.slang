@@ -1,7 +1,8 @@
 module "@org/lib";
 
-// Mutation: `add` return type narrows from int to float.
-// Consumer assigns to `int s` — implicit narrowing conversion.
+// Mutation: `add` return type changes from int to float (a widening
+// at the declaration). The implicit narrowing then happens at the
+// consumer's `int s = add(...)` assignment site.
 public float add(int x, int y) { return float(x + y); }
 
 public T identity<T>(T x) { return x; }

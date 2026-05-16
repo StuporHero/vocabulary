@@ -43,41 +43,49 @@ stages each case at `<tmp>/@org/lib.slang`, compiles the consumer
 against it, and records the actual outcome side-by-side with the
 prediction. Capability cases bring their own consumer because they
 need a call into a `[require]`-annotated function: Slang attaches
-the requirement to the declaration, and the entry point inherits
-requirements from everything it transitively calls. The check
-happens at the entry-point boundary against the target.
+the requirement to the declaration, and the compiler *infers*
+each entry point's effective requirement set from its transitive
+call graph (`user-guide/05-capabilities.md` capability inference).
+The check happens at the entry-point boundary against the target.
 
 **Baseline is deliberately minimal.** It's a representative public
 surface for the catalogue's purposes (function / generic / struct /
 interface / conformance), but it doesn't look like a real Slang
 library: there are no `__init` constructors, no `extension`s, no
-interface inheritance, no `where`-clause with multiple bounds, and
-`identity<T>` is intentionally unconstrained because that's the
-test subject for `add-generic-constraint`. Production Slang code
-would use constrained generics by default
-(`user-guide/06-interfaces-generics.md` L95 explicitly warns
-against bare `<T>`). The consumer's `Square sq1; sq1.side = 6;`
-pattern is also unidiomatic but chosen so the catalogue isolates
-named-field-access semantics from constructor semantics. See
-Limitations for what's untested as a consequence.
+interface inheritance, no `where`-clause with multiple bounds. The
+generic `identity<T>(T x) { return x; }` is intentionally
+unconstrained because it's the test subject for
+`add-generic-constraint`; this is also legitimate Slang —
+`user-guide/06-interfaces-generics.md` L95 notes that a bare `<T>`
+fails to type-check only at any line that *accesses* a member of
+`T` (since the compiler can't verify the member exists without a
+constraint); `identity` never touches `T`'s API, so no constraint
+is needed. Real libraries usually do touch their generic type
+parameters, which is why bare `<T>` is rare in practice. The
+consumer's `Square sq1; sq1.side = 6;` pattern is similarly
+unidiomatic (idiomatic Slang would use a positional initializer
+or an `__init`) but chosen so the catalogue isolates named-field-
+access semantics from constructor semantics. See Limitations for
+what's untested as a consequence.
 
 **Compilation scope.** Every case compiles with `-target spirv
 -stage compute -entry main` and no explicit `-profile` flag.
 Capability findings in particular are defined by the target; a
 glsl- or hlsl-bound consumer might flip individual outcomes. Slang's
-capability atoms come in distinct categories that the README will
-reference (`user-guide/05-capabilities.md`,
-`user-guide/a3-02-reference-capability-atoms.md`):
+capability-atom reference
+(`user-guide/a3-02-reference-capability-atoms.md`) groups atoms
+into six sections — Targets, Stages, Versions, Extensions,
+Compound Capabilities, and Other. The categories the catalogue
+touches:
 
-- **Target atoms** (`hlsl`, `glsl`, `spirv`, `metal`, `wgsl`,
-  `cuda`, `cpp`) — mutually exclusive within the target group.
-- **Version atoms** (`spirv_1_0`…`spirv_1_6`, `sm_6_0`…`sm_6_8`, …)
-  — refine a target; later versions imply earlier ones.
-- **Extension / feature atoms** (`SPV_KHR_*`, `spvShaderClockKHR`,
-  `subgroup_basic`, …) — additional capabilities a target may or
-  may not provide.
-- **Stage atoms** (`vertex`, `fragment`, `compute`, …) — mutually
-  exclusive within the stage group.
+- **Targets** (`hlsl`, `glsl`, `spirv`, `metal`, `wgsl`, `cuda`,
+  `cpp`, `c`) — mutually exclusive within the targets group.
+- **Stages** (`vertex`, `fragment`, `compute`, …) — mutually
+  exclusive within the stages group.
+- **Versions** (`spirv_1_0`…, `sm_6_0`…, …) — refine a target;
+  later versions imply earlier ones.
+- **Extensions** (`SPV_KHR_*`, `spvShaderClockKHR`, …) — optional
+  features a target may or may not provide.
 
 The catalogue's capability findings are scoped to a spirv-compute
 consumer.
@@ -169,8 +177,9 @@ consumer that dispatched via an interface-typed value (`IShape s = sq1;
 s.area()`) might or might not behave the same way — that's untested.
 
 (Interface-member visibility isn't catalogued either. Slang's rule
-is that interface members inherit visibility from the parent
-interface — `user-guide/04-modules-and-access-control.md` L185 — so
+is that interface members *default to* the visibility of the parent
+interface when no modifier is written
+— `user-guide/04-modules-and-access-control.md` L185 — so
 `public→internal` demotion on an interface method isn't a separate
 mutation shape from demoting the whole interface, which we cover.)
 
@@ -366,13 +375,16 @@ invocations is not tested here.
 
 3. **The digest mechanism is not a single slangc artifact today.**
    Building it means combining the IR (for structural surface — note
-   that the IR captures the *unspecialized* generic form, which is
-   what a digest would actually hash), per-symbol capability DNF
-   extraction, and a canonicalization pass that strips identifiers
-   the catalogue showed are invisible. This is the spec-deferral the
-   sketch already calls for, but now the catalogue gives a (limited)
-   set of concrete acceptance criteria for it. The "no MISS observed
-   for the binary" claim that motivates building on the binary form
+   that Slang precompiles generic *definitions* and defers
+   specialization to link time per
+   `user-guide/10-link-time-specialization.md`, so the IR captures
+   the generic definition, which is what a digest would actually
+   hash), per-symbol capability DNF extraction, and a
+   canonicalization pass that strips identifiers the catalogue
+   showed are invisible. This is the spec-deferral the sketch already
+   calls for, but now the catalogue gives a (limited) set of concrete
+   acceptance criteria for it. The "no MISS observed for the binary"
+   claim that motivates building on the binary form
    is fragile at this sample size — see the Limitations bullet on
    sample size.
 

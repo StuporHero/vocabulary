@@ -1,10 +1,11 @@
-// String-form module name with a scope prefix. The user-guide
-// permits string-form module/import names
-// (`user-guide/04-modules-and-access-control.md` lines 80-86); the
-// string content is opaque to the language. The prior
-// module-name-identity experiment confirmed `@org/name` works as a
-// real identity at link time. The shape matches the registry naming
-// decided in docs/sketch.md §3.1.
+// String-form module name. The identifier form (`module foo;`)
+// accepts only valid Slang identifiers, so `@org/lib` — containing
+// `@` and `/` — has to use the string form, which the user-guide
+// permits with opaque content
+// (`user-guide/04-modules-and-access-control.md` lines 80-86). The
+// prior module-name-identity experiment confirmed `@org/lib` works
+// as a real identity at link time. The shape matches the registry
+// naming decided in docs/sketch.md §3.1.
 module "@org/lib";
 
 public int add(int x, int y) { return x + y; }
