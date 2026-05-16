@@ -10,6 +10,7 @@ The Slang compiler binary itself is downloaded by each experiment's
 `run.sh` into `experiments/.slang-bin/` (gitignored). Re-running an
 experiment is idempotent once the binary is cached.
 
-| Experiment                                              | Question                                                                                   | Status |
-|---------------------------------------------------------|--------------------------------------------------------------------------------------------|--------|
+| Experiment                                                | Question                                                                                   | Status |
+|-----------------------------------------------------------|--------------------------------------------------------------------------------------------|--------|
 | [`module-name-identity/`](module-name-identity/README.md) | Does Slang's linker key module identity on the full string form (`@ns/foo`) or just the basename? | Settled: full-string. |
+| [`semver-break-catalog/`](semver-break-catalog/README.md) | Which kinds of public-API mutations break a downstream consumer, and do existing slangc artifacts work as a signature digest? | Catalogued: 29 cases + digest probe (representative subset; see Limitations). |

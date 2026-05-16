@@ -1,0 +1,355 @@
+Slang semver-break catalogue
+Date  : 2026-05-16T23:10:42Z
+Slangc: 2026.8.1
+
+================================================================
+CASE     : baseline/control
+EXPECTED : passes
+ACTUAL   : passes    [ok]
+EXIT     : 0
+
+================================================================
+CASE     : capabilities/baseline-control
+EXPECTED : passes
+ACTUAL   : passes    [ok]
+EXIT     : 0
+
+================================================================
+CASE     : capabilities/cross-target-require
+EXPECTED : breaks
+ACTUAL   : breaks    [ok]
+EXIT     : 255
+----------------------------------------------------------------
+error[E36107]: unavailable features in entry point
+ --> cases/capabilities/cross-target-require/consumer.slang:5:6
+  |
+5 | void main(uint3 tid : SV_DispatchThreadID)
+  |      ^^^^ entrypoint 'main' uses features that are not available in 'compute' stage for 'spirv' compilation target.
+--'
+note: see using of 'needs_caps'
+ --> cases/capabilities/cross-target-require/consumer.slang:7:13
+  |
+7 | int n = needs_caps();
+  |         ^^^^^^^^^^
+--'
+note: see definition of 'needs_caps'
+ --> <STAGE>/@org/lib.slang:8:12
+  |
+8 | public int needs_caps() { return 42; }
+  |            ^^^^^^^^^^
+--'
+note: see declaration of 'require'
+ --> <STAGE>/@org/lib.slang:7:2
+  |
+7 | [require(hlsl, sm_6_5)]
+  |  ^^^^^^^
+--'
+
+================================================================
+CASE     : capabilities/narrow-require
+EXPECTED : passes
+ACTUAL   : passes    [ok]
+EXIT     : 0
+
+================================================================
+CASE     : capabilities/remove-require
+EXPECTED : passes
+ACTUAL   : passes    [ok]
+EXIT     : 0
+
+================================================================
+CASE     : conformances/add-conformance-elsewhere
+EXPECTED : passes
+ACTUAL   : passes    [ok]
+EXIT     : 0
+
+================================================================
+CASE     : conformances/remove-conformance
+EXPECTED : breaks
+ACTUAL   : breaks    [ok]
+EXIT     : 255
+----------------------------------------------------------------
+error[E38029]: type argument doesn't conform to interface
+  --> consumer.slang:28:13
+   |
+28 | int t = total_area<Square>(sq1, sq2);
+   |         ^^^^^^^^^^ type argument 'Square' does not conform to the required interface 'IShape'
+---'
+
+================================================================
+CASE     : functions/add-generic-constraint
+EXPECTED : breaks
+ACTUAL   : breaks    [ok]
+EXIT     : 255
+----------------------------------------------------------------
+error[E38029]: type argument doesn't conform to interface
+  --> consumer.slang:16:13
+   |
+16 | int i = identity<int>(3);
+   |         ^^^^^^^^ type argument 'int' does not conform to the required interface 'IShape'
+---'
+
+================================================================
+CASE     : functions/add-overload
+EXPECTED : passes
+ACTUAL   : passes    [ok]
+EXIT     : 0
+
+================================================================
+CASE     : functions/add-param-default
+EXPECTED : passes
+ACTUAL   : passes    [ok]
+EXIT     : 0
+
+================================================================
+CASE     : functions/add-param
+EXPECTED : breaks
+ACTUAL   : breaks    [ok]
+EXIT     : 255
+----------------------------------------------------------------
+error[E39999]: not enough arguments to call
+  --> consumer.slang:15:16
+   |
+15 | int s = add(1, 2);
+   |            ^ not enough arguments to call (got 2, expected 3)
+---'
+note[E40011]: candidate: public func add(int, int, int) -> int
+ --> <STAGE>/@org/lib.slang:4:12
+  |
+4 | public int add(int x, int y, int z) { return x + y + z; }
+  |            ^^^
+--'
+
+================================================================
+CASE     : functions/change-param-type
+EXPECTED : passes
+ACTUAL   : passes    [ok]
+EXIT     : 0
+
+================================================================
+CASE     : functions/change-return-type
+EXPECTED : breaks
+ACTUAL   : passes    [SURPRISE]
+EXIT     : 0
+----------------------------------------------------------------
+warning[E30081]: implicit conversion not recommended
+  --> consumer.slang:15:16
+   |
+15 | int s = add(1, 2);
+   |            ^ implicit conversion from 'float' to 'int' is not recommended
+---'
+
+================================================================
+CASE     : functions/remove-param
+EXPECTED : breaks
+ACTUAL   : breaks    [ok]
+EXIT     : 255
+----------------------------------------------------------------
+error[E39999]: too many arguments to call
+  --> consumer.slang:15:16
+   |
+15 | int s = add(1, 2);
+   |            ^ too many arguments to call (got 2, expected 1)
+---'
+note[E40011]: candidate: public func add(int) -> int
+ --> <STAGE>/@org/lib.slang:4:12
+  |
+4 | public int add(int x) { return x; }
+  |            ^^^
+--'
+
+================================================================
+CASE     : functions/rename-generic-param
+EXPECTED : passes
+ACTUAL   : passes    [ok]
+EXIT     : 0
+
+================================================================
+CASE     : functions/rename-param
+EXPECTED : passes
+ACTUAL   : passes    [ok]
+EXIT     : 0
+
+================================================================
+CASE     : functions/rename
+EXPECTED : breaks
+ACTUAL   : breaks    [ok]
+EXIT     : 255
+----------------------------------------------------------------
+error[E30015]: undefined identifier
+  --> consumer.slang:15:13
+   |
+15 | int s = add(1, 2);
+   |         ^^^ undefined identifier 'add'.
+---'
+
+================================================================
+CASE     : interfaces/add-associated-type
+EXPECTED : breaks
+ACTUAL   : breaks    [ok]
+EXIT     : 255
+----------------------------------------------------------------
+error[E38100]: missing interface member
+  --> <STAGE>/@org/lib.slang:21:24
+   |
+21 | public struct Square : IShape
+   |                        ^^^^^^ type 'Square' does not provide required interface member 'Coord'
+---'
+note: see declaration of 'Coord'
+  --> <STAGE>/@org/lib.slang:17:20
+   |
+17 | associatedtype Coord;
+   |                ^^^^^
+---'
+error[E39999]: import failed due to compilation error
+ --> consumer.slang:1:8
+  |
+1 | import "@org/lib";
+  |        ^^^^^^^^^^ import of module '@org/lib' failed because of a compilation error
+--'
+fatal error[E40003]: compilation ceased
+
+================================================================
+CASE     : interfaces/add-method-no-default
+EXPECTED : breaks
+ACTUAL   : breaks    [ok]
+EXIT     : 255
+----------------------------------------------------------------
+error[E38100]: missing interface member
+  --> <STAGE>/@org/lib.slang:21:24
+   |
+21 | public struct Square : IShape
+   |                        ^^^^^^ type 'Square' does not provide required interface member 'perimeter'
+---'
+note: see declaration of 'perimeter'
+  --> <STAGE>/@org/lib.slang:18:9
+   |
+18 | int perimeter();
+   |     ^^^^^^^^^
+---'
+error[E39999]: import failed due to compilation error
+ --> consumer.slang:1:8
+  |
+1 | import "@org/lib";
+  |        ^^^^^^^^^^ import of module '@org/lib' failed because of a compilation error
+--'
+fatal error[E40003]: compilation ceased
+
+================================================================
+CASE     : interfaces/add-method-with-default
+EXPECTED : passes
+ACTUAL   : passes    [ok]
+EXIT     : 0
+
+================================================================
+CASE     : interfaces/change-method-return-type
+EXPECTED : passes
+ACTUAL   : passes    [ok]
+EXIT     : 0
+----------------------------------------------------------------
+warning[E30081]: implicit conversion not recommended
+  --> consumer.slang:27:21
+   |
+27 | int a = sq1.area();
+   |                 ^ implicit conversion from 'float' to 'int' is not recommended
+---'
+
+================================================================
+CASE     : interfaces/rename-method
+EXPECTED : breaks
+ACTUAL   : breaks    [ok]
+EXIT     : 255
+----------------------------------------------------------------
+error[E30027]: member not found
+  --> consumer.slang:27:17
+   |
+27 | int a = sq1.area();
+   |             ^^^^ 'area' is not a member of 'Square'.
+---'
+
+================================================================
+CASE     : types/add-field
+EXPECTED : passes
+ACTUAL   : passes    [ok]
+EXIT     : 0
+
+================================================================
+CASE     : types/change-field-type
+EXPECTED : passes
+ACTUAL   : passes    [ok]
+EXIT     : 0
+
+================================================================
+CASE     : types/field-public-to-internal
+EXPECTED : breaks
+ACTUAL   : breaks    [ok]
+EXIT     : 255
+----------------------------------------------------------------
+error[E30600]: declaration not accessible
+  --> consumer.slang:19:7
+   |
+19 | p.x = 4;
+   |   ^ 'x' is not accessible from the current context.
+---'
+
+================================================================
+CASE     : types/remove-field
+EXPECTED : breaks
+ACTUAL   : breaks    [ok]
+EXIT     : 255
+----------------------------------------------------------------
+error[E30027]: member not found
+  --> consumer.slang:20:7
+   |
+20 | p.y = 5;
+   |   ^ 'y' is not a member of 'Point'.
+---'
+
+================================================================
+CASE     : types/rename-field
+EXPECTED : breaks
+ACTUAL   : breaks    [ok]
+EXIT     : 255
+----------------------------------------------------------------
+error[E30027]: member not found
+  --> consumer.slang:19:7
+   |
+19 | p.x = 4;
+   |   ^ 'x' is not a member of 'Point'.
+---'
+
+================================================================
+CASE     : types/reorder-fields
+EXPECTED : passes
+ACTUAL   : passes    [ok]
+EXIT     : 0
+
+================================================================
+CASE     : types/type-public-to-internal
+EXPECTED : breaks
+ACTUAL   : breaks    [ok]
+EXIT     : 255
+----------------------------------------------------------------
+error[E30601]: visibility higher than parent
+  --> <STAGE>/@org/lib.slang:10:16
+   |
+10 | public int x;
+   |            ^ 'x' cannot have a higher visibility than 'Point'.
+---'
+error[E30601]: visibility higher than parent
+  --> <STAGE>/@org/lib.slang:11:16
+   |
+11 | public int y;
+   |            ^ 'y' cannot have a higher visibility than 'Point'.
+---'
+error[E39999]: import failed due to compilation error
+ --> consumer.slang:1:8
+  |
+1 | import "@org/lib";
+  |        ^^^^^^^^^^ import of module '@org/lib' failed because of a compilation error
+--'
+fatal error[E40003]: compilation ceased
+
+================================================================
+TOTAL    : 29
+SURPRISES: 1

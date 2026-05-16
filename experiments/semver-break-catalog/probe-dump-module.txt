@@ -1,0 +1,62 @@
+Slang -dump-module probe
+Date  : 2026-05-16T23:10:59Z
+
+Step 1a. Stability of -dump-module text: same baseline compiled twice.
+  hash 1: 7edae499d79a0098111ea2158789881d5e826efaa08a9a0f4ed1188f29efd64c
+  hash 2: 7edae499d79a0098111ea2158789881d5e826efaa08a9a0f4ed1188f29efd64c
+  -> STABLE: hashes match across runs.
+
+Step 1b. Stability of binary .slang-module: same baseline compiled twice.
+  hash 1: 1c560b3d8b2e91995d015cfd7651a6ef07c34b54428973698e03ff800831f013
+  hash 2: 1c560b3d8b2e91995d015cfd7651a6ef07c34b54428973698e03ff800831f013
+  -> STABLE: binary hashes match across runs.
+
+Step 2. Per-case digest vs baseline.
+  - Main surface cases compared against baseline/lib.slang.
+  - Capability cases compared against capabilities/baseline-control/lib.slang
+    (they share a different baseline; the lib.slang structure is smaller).
+  - Two digest sources compared: -dump-module text vs raw .slang-module file.
+  - Digest verdicts are classified against the empirical (ACTUAL)
+    outcome from results.txt, not the author's a-priori prediction
+    (EXPECTED). Both are shown for reference.
+
+case                                          pred    actual  dump      file      notes
+baseline/control                              passes  passes  same      same      dump=ok file=ok
+capabilities/baseline-control                 passes  passes  same      same      dump=ok file=ok
+capabilities/cross-target-require             breaks  breaks  same      diff      dump=MISS file=ok
+capabilities/narrow-require                   passes  passes  same      diff      dump=ok file=OVER
+capabilities/remove-require                   passes  passes  same      diff      dump=ok file=OVER
+conformances/add-conformance-elsewhere        passes  passes  diff      diff      dump=OVER file=OVER
+conformances/remove-conformance               breaks  breaks  diff      diff      dump=ok file=ok
+functions/add-generic-constraint              breaks  breaks  diff      diff      dump=ok file=ok
+functions/add-overload                        passes  passes  diff      diff      dump=OVER file=OVER
+functions/add-param-default                   passes  passes  diff      diff      dump=OVER file=OVER
+functions/add-param                           breaks  breaks  diff      diff      dump=ok file=ok
+functions/change-param-type                   passes  passes  diff      diff      dump=OVER file=OVER
+functions/change-return-type                  breaks  passes  diff      diff      dump=OVER file=OVER
+functions/remove-param                        breaks  breaks  diff      diff      dump=ok file=ok
+functions/rename-generic-param                passes  passes  diff      diff      dump=OVER file=OVER
+functions/rename-param                        passes  passes  diff      diff      dump=OVER file=OVER
+functions/rename                              breaks  breaks  diff      diff      dump=ok file=ok
+interfaces/add-associated-type                breaks  breaks  ERROR-emit ERROR-emit dump=ok-err file=ok-err
+interfaces/add-method-no-default              breaks  breaks  ERROR-emit ERROR-emit dump=ok-err file=ok-err
+interfaces/add-method-with-default            passes  passes  diff      diff      dump=OVER file=OVER
+interfaces/change-method-return-type          passes  passes  diff      diff      dump=OVER file=OVER
+interfaces/rename-method                      breaks  breaks  diff      diff      dump=ok file=ok
+types/add-field                               passes  passes  diff      diff      dump=OVER file=OVER
+types/change-field-type                       passes  passes  diff      diff      dump=OVER file=OVER
+types/field-public-to-internal                breaks  breaks  diff      diff      dump=ok file=ok
+types/remove-field                            breaks  breaks  diff      diff      dump=ok file=ok
+types/rename-field                            breaks  breaks  diff      diff      dump=ok file=ok
+types/reorder-fields                          passes  passes  diff      diff      dump=OVER file=OVER
+types/type-public-to-internal                 breaks  breaks  ERROR-emit ERROR-emit dump=ok-err file=ok-err
+
+Legend:
+  ok     = digest verdict agrees with empirical outcome.
+  ok-err = library no longer compiles; either digest signals it.
+  MISS   = false negative — digest matches when consumer breaks.
+           Lets a real major change ship as minor. Dangerous.
+  OVER   = false positive — digest differs when consumer doesn't
+           break. For a publish-time tool this forces a major
+           bump that wasn't needed, which trains authors to
+           override or ignore the tool. Not 'just nuisance.'
