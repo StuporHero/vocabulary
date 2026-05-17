@@ -199,10 +199,14 @@ the consumer-observable ABI per the catalogue), and treat the
 int↔float-style implicit-conversion cases as breaking. No existing
 slangc artifact is sufficient on its own.
 
-**Open question** (versioning sub-decision, still unresolved).
-
-- Pre-1.0 rules (Cargo treats `0.x.y` minor as breaking; npm doesn't).
-  Not driven by any Slang-specific fact — a values choice.
+**Pre-1.0 convention.** Follow the universal convention: in `0.X.Y`,
+bumping `X` is the breaking-change marker (`^0.3.5` resolves to
+`>=0.3.5, <0.4.0`). Same as Cargo, npm, Go, and Bazel BCR — no
+deliberation needed. The orthogonal question of how strict
+`slangpm publish` should be when refusing digest-changing patch
+bumps on pre-1.0 packages (full enforcement / advisory / off) is a
+CLI-UX knob, deferred to `sig-digest-spec.md` or `cli-ux.md`; it
+doesn't affect anything else in this sketch.
 
 ---
 
@@ -476,7 +480,7 @@ escape hatch.
 
 | Dimension                           | Options on the table        | Must decide before code | Deferred until            |
 | ----------------------------------- | --------------------------- | ----------------------- | ------------------------- |
-| 3.1 Identity & versioning           | naming: scoped at every layer (decided); semver semantics: mechanical Elm-style enforcement (decided, digest spec deferred); pre-1.0 rule: open | naming + enforcement: done; pre-1.0 rule: no | — |
+| 3.1 Identity & versioning           | naming: scoped at every layer; semver semantics: mechanical Elm-style enforcement (digest spec deferred); pre-1.0: standard convention | **decided**            | —                         |
 | 3.2 Manifest format & fields        | TOML / JSON / Slang-native  | **yes**                | —                         |
 | 3.3 Source vs. precompiled          | source / artifact / hybrid  | **yes**                | —                         |
 | 3.4 Compiler / target / cap matrix  | surface declared DNF / expand to explicit matrix | no | after 3.3 |
@@ -645,8 +649,7 @@ slang_version = "2025.3"
 ## 8. What's next
 
 Decide the remaining `MUST-DECIDE-NOW` rows in the ledger (3.2, 3.3,
-3.6) and the pre-1.0 rule still open in 3.1. Once those are locked,
-fork this document into:
+3.6). Once those are locked, fork this document into:
 
 - `manifest-spec.md` — normative schema and validation rules.
 - `registry-protocol.md` — index layout, publish flow, auth.
