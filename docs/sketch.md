@@ -147,13 +147,62 @@ URL-shaped string imports too, but they're structurally identical to B
 with a hostname tax that couples identity to a hoster for no extra
 benefit. Option D layers on top of B unchanged.
 
-**Open questions** (versioning sub-decision, still unresolved).
+**Decision (versioning): mechanical Elm-style publish-time enforcement,
+with the digest spec deferred.** Grounded empirically in
+`experiments/semver-break-catalog/` (29 mutation cases probed against
+a fixed downstream consumer, plus a probe of existing slangc artifacts
+as digest candidates).
 
-- How does semver map onto Slang's surface? Proposal: a Slang-aware
-  *signature digest* (over public functions, generic parameters, interface
-  conformances) defines "did the API change", with semver as the human-facing
-  promise.
+For semver semantics, the catalogue gives a first-cut classification
+of mutations to a Slang module's public surface (scoped to the
+catalogue's consumer access patterns — see the experiment README's
+Limitations section):
+
+- **Breaking by signature.** Function or method rename; required
+  parameter add; parameter remove; type or field rename or remove;
+  visibility demotion (public → internal); conformance removal;
+  interface method add without a default implementation; associated
+  type add (Slang has no observed default-binding mechanism for
+  associated types); generic constraint tightening.
+- **Breaking by capability.** Switching a `[require]` declaration
+  to an atom that conflicts with one the original transitively
+  implied, within a mutually-exclusive atom group (target group:
+  `spirv` ↔ `hlsl` ↔ `metal` ↔ …; stage group: `vertex` ↔
+  `fragment` ↔ `compute` ↔ …).
+- **Conditionally additive.** Field add, field reorder, overload
+  add, interface method add *with* a default, new conformance for a
+  new type, parameter or generic-parameter rename, narrowing along
+  a capability-implication chain (e.g. `spirv_1_3` → `spirv_1_0`),
+  removing a `[require]` entirely. These passed under the
+  catalogue's consumer; some flip under different consumer access
+  patterns (positional struct init, dynamic dispatch through an
+  interface-typed value, keyword arguments).
+- **Implicit conversions.** Slang accepts `int`↔`float` coercions
+  with a warning or silently at function returns, struct fields,
+  method returns, and parameters. The compiler tolerates these; the
+  digest should treat them as breaking anyway, since the
+  publisher's intent is a type change.
+
+For enforcement, `slangpm publish` (or its equivalent) refuses a
+minor bump that crosses the digest boundary. The check **compiles
+the library**, not just diffs its surface — interface-conformance
+cascades like `add-method-no-default` produce errors inside the
+library itself, which a pure-surface diff would miss.
+
+The digest itself is deferred to a follow-up spec
+(`sig-digest-spec.md`, see §8). The catalogue gives concrete
+acceptance criteria: combine the binary `.slang-module`'s
+capability awareness with text-form filtering (`-dump-module` strips
+`[require]` annotations), strip identifier-rename noise (parameter
+names, generic-parameter names, internal symbols are not part of
+the consumer-observable ABI per the catalogue), and treat the
+int↔float-style implicit-conversion cases as breaking. No existing
+slangc artifact is sufficient on its own.
+
+**Open question** (versioning sub-decision, still unresolved).
+
 - Pre-1.0 rules (Cargo treats `0.x.y` minor as breaking; npm doesn't).
+  Not driven by any Slang-specific fact — a values choice.
 
 ---
 
@@ -427,7 +476,7 @@ escape hatch.
 
 | Dimension                           | Options on the table        | Must decide before code | Deferred until            |
 | ----------------------------------- | --------------------------- | ----------------------- | ------------------------- |
-| 3.1 Identity & versioning           | naming: scoped at every layer (decided); semver semantics: open | naming: done; semver: **yes** | — |
+| 3.1 Identity & versioning           | naming: scoped at every layer (decided); semver semantics: mechanical Elm-style enforcement (decided, digest spec deferred); pre-1.0 rule: open | naming + enforcement: done; pre-1.0 rule: no | — |
 | 3.2 Manifest format & fields        | TOML / JSON / Slang-native  | **yes**                | —                         |
 | 3.3 Source vs. precompiled          | source / artifact / hybrid  | **yes**                | —                         |
 | 3.4 Compiler / target / cap matrix  | surface declared DNF / expand to explicit matrix | no | after 3.3 |
@@ -595,10 +644,14 @@ slang_version = "2025.3"
 
 ## 8. What's next
 
-Decide the four `MUST-DECIDE-NOW` rows in the ledger (3.1, 3.2, 3.3, 3.6).
-Once those are locked, fork this document into:
+Decide the remaining `MUST-DECIDE-NOW` rows in the ledger (3.2, 3.3,
+3.6) and the pre-1.0 rule still open in 3.1. Once those are locked,
+fork this document into:
 
 - `manifest-spec.md` — normative schema and validation rules.
 - `registry-protocol.md` — index layout, publish flow, auth.
 - `resolver-semantics.md` — algorithm, error model, lockfile format.
 - `cli-ux.md` — command-by-command reference.
+- `sig-digest-spec.md` — canonicalisation rules for the publish-time
+  semver-enforcement digest (3.1 decision; acceptance criteria in
+  `experiments/semver-break-catalog/`).
