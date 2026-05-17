@@ -240,39 +240,50 @@ required: `name`, `version`, `license`, and `slang.min_version`.
 Everything else is optional or excluded. Concretely:
 
 - **Identity.** `name` (required, scoped per §3.1 — `"@org/pkg"`);
-  `version` (required, semver triple); `module` (optional, defaults
-  to `name`; escape hatch for unscoped flat-name packages).
+  `version` (required, semver triple). No separate `module` field:
+  §3.1 settled that the registry name *is* the Slang module identity
+  verbatim, at every layer.
 - **Metadata.** `description`, `authors`, `repository`, `keywords`
   (optional); `license` (required, SPDX license expression — SPDX
-  list and expression grammar per the version pinned by the
-  registry; both single identifiers and expressions like
-  `"Apache-2.0 OR MIT"` are accepted).
+  License List 3.x; both single identifiers (`"MIT"`) and expressions
+  with `OR` / `AND` / `WITH` (`"Apache-2.0 OR MIT"`) accepted;
+  `LicenseRef-*` custom IDs deferred. Validation bounds for
+  `keywords` (max count, max length, allowed character class) are
+  validator-spec concerns; v0 default is Cargo's: 5 keywords,
+  ASCII alnum + `-` + `_`, 20 chars each.
 - **Compiler envelope.** `slang.min_version` (required);
   `slang.max_version` (optional, unbounded if absent). Grouped in a
   `[slang]` section in TOML so further `slang.*` fields can be added
   later without flat-namespace churn.
 - **Target / capability.** `targets` (optional, list of Slang
-  backends from the set named in §1's glossary entry; absence means
-  *target-agnostic* and is the right default for pure shading-math
-  libraries); `capabilities` (optional, DNF of Slang atoms per §3.4,
-  capability-neutral if empty or absent).
+  backends from the *closed* set in §1's glossary entry — strings
+  outside that set are a hard rejection; absence means *target-
+  agnostic*, which is the right default for pure shading-math
+  libraries, and tells the resolver to accept the package against
+  any consumer target); `capabilities` (optional, DNF of Slang
+  atoms per §3.4 — use the *public* atom form, e.g. `sm_6_5` not
+  `_sm_6_5`; capability-neutral if empty or absent).
 - **API shape.** `entry_points` (optional, libraries omit;
-  `[[entry_points]]` array of `{ name, stage }`; stage strings use
-  the canonical form from
-  `experiments/.slang-bin/share/doc/slang/command-line-slangc-reference.md`
-  — `fragment`, not `pixel`; `tesseval`, not `domain`; etc.);
-  `exports.interfaces` (optional, encouraged for discovery).
-- **Dependencies.** `[dependencies]` table (optional; constraint-
-  string syntax is the §3.5 resolver's decision, not §3.2's).
+  `[[entry_points]]` array of `{ name, stage }`; `stage` is any
+  string slangc accepts, per the alias table in
+  `command-line-slangc-reference.md` — Slang itself does not
+  designate a canonical form between e.g. `pixel`/`fragment` or
+  `domain`/`tesseval`); `exports.interfaces` (optional, a
+  registry-discovery hint listing publicly-exposed interfaces — not
+  a Slang access-control declaration; Slang's access control is
+  `public` / `internal` / `private` in source).
+- **Dependencies.** `[dependencies]` table (optional). The exact
+  constraint-string grammar (caret, tilde, ranges, bare versions)
+  is §3.5's call; the example below uses Cargo-flavoured strings
+  for illustration only.
 
 Canonical TOML form:
 
 ```toml
 name         = "@org/pkg"
 version      = "1.2.3"
-module       = "@org/pkg"          # optional; defaults to name
 description  = "Disney BRDF for Slang."
-license      = "MIT"               # SPDX identifier
+license      = "MIT"               # SPDX identifier (or expression)
 authors      = ["Alice <a@example.com>"]
 repository   = "https://github.com/example/pkg"
 keywords     = ["brdf", "shading"]
@@ -290,31 +301,45 @@ max_version = "<2027.0"            # optional
 name  = "main_cs"
 stage = "compute"
 
-[exports]                          # optional; encouraged
+[exports]                          # optional; registry discovery hint
 interfaces = ["IBRDF", "ISampler"]
 
-[dependencies]
-disney-brdf  = "^0.3"
-envmap-utils = "1.2"
+[dependencies]                     # constraint syntax illustrative; see §3.5
+"@alice/disney-brdf"  = "^0.3"
+"@alice/envmap-utils" = "1.2"
 ```
 
 **Excluded / deferred.**
 
-- **`features`** (Cargo-style optional dependencies) — deferred to
-  v1. Cargo's feature system is one of its hardest debugging
-  surfaces, and there's no clear shader-specific use case that
-  justifies the complexity upfront. v0 packages either depend on
-  something or don't.
+- **`features`** (Cargo-style conditional-compilation flags) —
+  deferred to v1. Cargo's feature system is one of its hardest
+  debugging surfaces, and there's no clear shader-specific use case
+  that justifies the complexity upfront. v0 packages either depend
+  on something or don't.
 - **Build scripts** — excluded. §3.9 already commits to "no build
   scripts in v0." Manifest is declarative only.
-- **Multi-module packages** — v0 ships one Slang module per package
-  (one primary file with `module foo;`). Authors who want a related
-  family of modules publish a small constellation of packages.
+- **Multi-module packages** — v0 ships one Slang module per package.
+  A module may span multiple `.slang` files via `__include` (per §1's
+  glossary); the constraint is one module identity per package, not
+  one file. Authors who want a related family of modules publish a
+  small constellation of packages.
   Relaxable in v1 if the manifest complexity proves worth it.
 - **Non-Slang assets** (LUTs, ONNX weights, sampling tables) —
   excluded from v0 packages. Assets distributed via a separate
   mechanism we'll figure out in v1. This matches the source-only
   direction §3.3 is heading and keeps the registry's scope tight.
+
+**Open questions.**
+
+- Exact SPDX list revision the validator pins (3.x family is fine;
+  the specific revision is `manifest-spec.md` territory).
+- Whether the `[exports]` discovery hint is worth carrying in v0 at
+  all, given that a registry could derive the same information by
+  parsing the module's `public` interface declarations.
+- What `slangpm publish` actually validates before upload — the
+  catalogue-grounded digest check (§3.1) is mandatory, but whether
+  publish also runs a target-compile pre-check is §3.6 / `cli-ux.md`
+  territory.
 
 ---
 
@@ -551,7 +576,8 @@ note it.
 
 ### 6.1 Publish a BRDF library
 
-Alice maintains a `disney-brdf` Slang module. She writes a manifest:
+Alice maintains a Slang module she wants to publish as
+`@alice/disney-brdf`. She writes a manifest:
 
 ```toml
 name    = "@alice/disney-brdf"
@@ -568,9 +594,16 @@ interfaces = ["IBRDF"]
 Pure shading math, no special capability requirements, target-agnostic
 — so `targets` and `capabilities` are omitted entirely.
 
-She runs `slangpm publish`. The CLI hashes the source tree and uploads
-`(manifest, source tarball, signature)` to the index. The index is a
-git repo; her token gives her commit access to the `@alice/` scope.
+She runs `slangpm publish`. The CLI runs the §3.1 digest check
+against the prior published version (refusing the bump if the digest
+crosses the boundary the chosen semver level allows), hashes the
+source tree, and uploads `(manifest, source tarball, signature)` to
+the index. The index is a git repo; her token gives her commit
+access to the `@alice/` scope.
+
+> **Gap surfaced:** publish-time validation beyond the digest check
+> (e.g. a target-compile pre-check against `targets` when declared)
+> is §3.6 / `cli-ux.md` territory and not pinned yet.
 
 ### 6.2 Consume from a Vulkan engine
 
@@ -602,7 +635,7 @@ file and links a `Slang::deps` INTERFACE target.
 > their own `[require]` declarations and `slangc` checks them at compile
 > time. The resolver's job is to verify that *at least one* clause of each
 > dependency's declared DNF is compatible with the consumer's target/profile
-> set. Example: `envmap-sampling` declares
+> set. Example: `@alice/envmap-sampling` declares
 > `[["hlsl", "sm_6_5", "subgroup_basic"], ["spirv_1_4", "subgroup_basic"]]` and the
 > consumer's `targets = ["wgsl"]`. No clause is wgsl-compatible — resolver
 > rejects with a message naming the package, the consumer's target, and
@@ -612,10 +645,11 @@ file and links a `Slang::deps` INTERFACE target.
 ### 6.3 Pin across a Slang compiler upgrade
 
 Bob upgrades from Slang 2025.2 to 2026.1. The lockfile still pins
-`disney-brdf 0.3.0`, but that version's manifest says
-`slang.max_version = "<2026.0"`. `slangpm install` errors and points Bob at
-`slangpm update disney-brdf`, which finds `disney-brdf 0.4.0` declaring
-`slang.min_version = ">=2026.0"`, updates the lockfile, and proceeds.
+`@alice/disney-brdf 0.3.0`, but that version's manifest says
+`slang.max_version = "<2026.0"`. `slangpm install` errors and points
+Bob at `slangpm update @alice/disney-brdf`, which finds
+`@alice/disney-brdf 0.4.0` declaring `slang.min_version = ">=2026.0"`,
+updates the lockfile, and proceeds.
 
 > **Gap surfaced:** what if no compatible version exists? The CLI should
 > say *exactly* which transitive dep blocks the upgrade. PubGrub's
@@ -652,7 +686,7 @@ max_version = "<2027.0"
 interfaces = ["IEnvmapSampler"]
 
 [dependencies]
-disney-brdf = "^0.3"
+"@alice/disney-brdf" = "^0.3"
 ```
 
 ### 7.2 Example index entry (JSON, git-backed index)
@@ -683,13 +717,13 @@ disney-brdf = "^0.3"
 version = 1
 
 [[package]]
-name    = "envmap-sampling"
+name    = "@alice/envmap-sampling"
 version = "1.1.2"
 source  = "registry+https://slangpkg.dev/index"
 digest  = "sha256:0d2c…"
 
 [[package]]
-name    = "disney-brdf"
+name    = "@alice/disney-brdf"
 version = "0.3.4"
 source  = "registry+https://slangpkg.dev/index"
 digest  = "sha256:91af…"
