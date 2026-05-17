@@ -227,43 +227,87 @@ any), and exposed interfaces (for downstream conformance).
 - **C. Slang-native syntax.** A `package` declaration inside Slang itself.
   Maximally idiomatic; needs compiler support and tooling churn.
 
-**Strawman fields (format-agnostic).**
+**Decision: TOML (option A).** Cargo's `Cargo.toml` and Rust's
+`pyproject.toml` are the obvious precedents; comments, lightweight
+typing, and broad parser availability all favour it. JSON is fine for
+machine generation but loses comments, which manifests benefit from.
+Slang-native syntax (option C) is the long-term-cool option but
+requires slangc changes and bootstrap-order complexity; defer until
+the rest of the system has shipped.
 
-```
-name              = "..."             # registry identity
-version           = "x.y.z"
-module            = "..."             # Slang module name; defaults to `name` munged
-description       = "..."
-license           = "SPDX-id"
-authors           = [...]
-repository        = "..."
-keywords          = [...]
+**Required-field set.** For a publishable v0 package, five fields are
+required: `name`, `version`, `license`, `slang.min_version`, and
+`targets`. Everything else is optional or excluded. Concretely:
 
-slang.min_version = ">=2025.1"        # compiler range
-slang.max_version = "<2026.0"
-targets           = ["hlsl", "spirv", "metal"]   # what the package supports
+- **Identity.** `name` (required, scoped per §3.1 — `"@org/pkg"`);
+  `version` (required, semver triple); `module` (optional, defaults
+  to `name`; escape hatch for unscoped flat-name packages).
+- **Metadata.** `description`, `authors`, `repository`, `keywords`
+  (optional); `license` (required, SPDX identifier — registries
+  enforce this).
+- **Compiler envelope.** `slang.min_version` (required);
+  `slang.max_version` (optional, unbounded if absent). Grouped in a
+  `[slang]` section in TOML so further `slang.*` fields can be added
+  later without flat-namespace churn.
+- **Target / capability.** `targets` (required, list of Slang
+  backends); `capabilities` (optional, DNF of Slang atoms per §3.4,
+  capability-neutral if empty or absent).
+- **API shape.** `entry_points` (optional, libraries omit;
+  `[[entry_points]]` array of `{ name, stage }`);
+  `exports.interfaces` (optional, encouraged for discovery).
+- **Dependencies.** `[dependencies]` table (optional, syntax follows
+  the §3.5 resolver decision; v0 uses Cargo-style constraint strings).
 
-# Slang capability requirements, in disjunction-of-conjunctions form.
-# Atom names are Slang's own (see shader-slang/slang docs/user-guide/05-capabilities.md);
-# each inner list is AND'd, outer list is OR'd. Mirrors the shape of multiple
-# `[require(...)]` attributes on a Slang function.
-capabilities      = [
-  ["hlsl", "_sm_6_5"],
+Canonical TOML form:
+
+```toml
+name         = "@org/pkg"
+version      = "1.2.3"
+module       = "@org/pkg"          # optional; defaults to name
+description  = "Disney BRDF for Slang."
+license      = "MIT"               # SPDX identifier
+authors      = ["Alice <a@example.com>"]
+repository   = "https://github.com/example/pkg"
+keywords     = ["brdf", "shading"]
+targets      = ["hlsl", "spirv", "metal", "wgsl"]
+capabilities = [                   # optional; DNF of Slang atoms (see §3.4)
+  ["hlsl", "sm_6_5"],
   ["spirv_1_4", "SPV_KHR_ray_tracing"],
 ]
 
-entry_points      = [ { name = "main_cs", stage = "compute" }, ... ]
-exports.interfaces = ["IBRDF", "ISampler"]
+[slang]
+min_version = ">=2025.1"
+max_version = "<2027.0"            # optional
 
-dependencies      = { foo = ">=0.4, <0.5", bar = { version = "1.2", optional = true } }
-features          = { rt = ["bar"] }             # Cargo-style optional features
+[[entry_points]]                   # optional; libraries omit
+name  = "main_cs"
+stage = "compute"
+
+[exports]                          # optional; encouraged
+interfaces = ["IBRDF", "ISampler"]
+
+[dependencies]
+disney-brdf  = "^0.3"
+envmap-utils = "1.2"
 ```
 
-**Open questions.**
+**Excluded / deferred.**
 
-- Are multi-module packages allowed in v0, or strictly one module per package?
-- Are non-Slang assets (precomputed LUTs, ONNX weights for neural shaders)
-  allowed inside a package?
+- **`features`** (Cargo-style optional dependencies) — deferred to
+  v1. Cargo's feature system is one of its hardest debugging
+  surfaces, and there's no clear shader-specific use case that
+  justifies the complexity upfront. v0 packages either depend on
+  something or don't.
+- **Build scripts** — excluded. §3.9 already commits to "no build
+  scripts in v0." Manifest is declarative only.
+- **Multi-module packages** — v0 ships one Slang module per package
+  (one primary file with `module foo;`). Authors who want a related
+  family of modules publish a small constellation of packages.
+  Relaxable in v1 if the manifest complexity proves worth it.
+- **Non-Slang assets** (LUTs, ONNX weights, sampling tables) —
+  excluded from v0 packages. Assets distributed via a separate
+  mechanism we'll figure out in v1. This matches the source-only
+  direction §3.3 is heading and keeps the registry's scope tight.
 
 ---
 
@@ -481,7 +525,7 @@ escape hatch.
 | Dimension                           | Options on the table        | Must decide before code | Deferred until            |
 | ----------------------------------- | --------------------------- | ----------------------- | ------------------------- |
 | 3.1 Identity & versioning           | naming: scoped at every layer; semver semantics: mechanical Elm-style enforcement (digest spec deferred); pre-1.0: standard convention | **decided**            | —                         |
-| 3.2 Manifest format & fields        | TOML / JSON / Slang-native  | **yes**                | —                         |
+| 3.2 Manifest format & fields        | TOML; required: name, version, license, slang.min_version, targets; features/multi-module/assets deferred to v1 | **decided**            | —                         |
 | 3.3 Source vs. precompiled          | source / artifact / hybrid  | **yes**                | —                         |
 | 3.4 Compiler / target / cap matrix  | surface declared DNF / expand to explicit matrix | no | after 3.3 |
 | 3.5 Resolver + lockfile             | MVS / SAT / PubGrub         | no                      | after 3.1 + 3.2           |
@@ -574,31 +618,29 @@ These are sketches, not normative.
 ### 7.1 Example manifest (TOML)
 
 ```toml
-name              = "envmap-sampling"
-version           = "1.1.2"
-module            = "EnvmapSampling"
-description       = "Importance-sampled environment maps for Slang."
-license           = "MIT"
-authors           = ["Alice <a@example.com>"]
-repository        = "https://github.com/example/envmap-sampling"
-
-slang.min_version = ">=2025.2"
-slang.max_version = "<2027.0"
-targets           = ["hlsl", "spirv", "metal", "wgsl"]
-capabilities      = [
-  ["hlsl", "_sm_6_2"],
+name         = "@alice/envmap-sampling"
+version      = "1.1.2"
+description  = "Importance-sampled environment maps for Slang."
+license      = "MIT"
+authors      = ["Alice <a@example.com>"]
+repository   = "https://github.com/example/envmap-sampling"
+targets      = ["hlsl", "spirv", "metal", "wgsl"]
+capabilities = [
+  ["hlsl", "sm_6_2"],
   ["spirv_1_3"],
   ["metal"],
   ["wgsl"],
 ]
 
-exports.interfaces = ["IEnvmapSampler"]
+[slang]
+min_version = ">=2025.2"
+max_version = "<2027.0"
+
+[exports]
+interfaces = ["IEnvmapSampler"]
 
 [dependencies]
 disney-brdf = "^0.3"
-
-[features]
-multiscatter = []
 ```
 
 ### 7.2 Example index entry (JSON, git-backed index)
