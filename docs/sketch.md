@@ -57,16 +57,19 @@ Pinning these now to avoid bikeshedding later.
 
 - **Module** — the unit Slang's `module` declaration names; one or more
   `.slang` source files compiled together.
-- **Package** — the unit this registry distributes. A package contains
-  exactly one Slang module in v0 (relaxable in v1; see §3.2).
+- **Package** — the unit this registry distributes. Under this proposal
+  a package contains exactly one Slang module; multi-module packages
+  are a possible future relaxation (see §3.2).
 - **Target** — a compilation backend. The shader-language targets a
   package manifest will typically declare are `hlsl`, `dxil`, `spirv`,
   `glsl`, `metal`, `wgsl`, `cuda`, and `cpp`. `slangc` supports additional
   output forms (`metallib`, `host-cpp`, `torch`, …) that are out of scope
   for v0 manifests.
-- **Capability** — a Slang-declared requirement (e.g. `sm_6_5`,
+- **Capability** — a Slang-declared requirement (e.g. `_sm_6_5`,
   `raytracing`, `mesh`, `subgroup_basic`). Atom names and the implication
-  lattice are defined in `slang-capabilities.capdef`.
+  lattice are defined in `slang-capabilities.capdef`. Aliases like
+  `sm_6_5` (a disjunction-expanding shortcut for source code) are
+  slangc's convenience; registry storage uses atoms.
 - **Profile** — a `(compiler-version, target, capability-set)` triple
   against which an artifact is built.
 - **Artifact** — a built blob (`.slang-module` or per-target intermediate)
@@ -235,9 +238,10 @@ Slang-native syntax (option C) is the long-term-cool option but
 requires slangc changes and bootstrap-order complexity; defer until
 the rest of the system has shipped.
 
-**Required-field set.** For a publishable v0 package, four fields are
-required: `name`, `version`, `license`, and `slang.min_version`.
-Everything else is optional or excluded. Concretely:
+**Required-field set.** For a publishable package under this proposal,
+four fields are required: `name`, `version`, `license`, and
+`slang.min_version`. Everything else is optional or excluded.
+Concretely:
 
 - **Identity.** `name` (required, scoped per §3.1 — `"@org/pkg"`);
   `version` (required, semver triple). No separate `module` field:
@@ -249,29 +253,33 @@ Everything else is optional or excluded. Concretely:
   with `OR` / `AND` / `WITH` (`"Apache-2.0 OR MIT"`) accepted;
   `LicenseRef-*` custom IDs deferred. Validation bounds for
   `keywords` (max count, max length, allowed character class) are
-  validator-spec concerns; v0 default is Cargo's: 5 keywords,
-  ASCII alnum + `-` + `_`, 20 chars each.
+  validator-spec concerns; the initial spec adopts Cargo's defaults
+  (5 keywords, ASCII alnum + `-` + `_`, 20 chars each).
 - **Compiler envelope.** `slang.min_version` (required);
   `slang.max_version` (optional, unbounded if absent). Grouped in a
   `[slang]` section in TOML so further `slang.*` fields can be added
   later without flat-namespace churn.
 - **Target / capability.** `targets` (optional, list of Slang
-  backends from the *closed* set in §1's glossary entry — strings
-  outside that set are a hard rejection; absence means *target-
-  agnostic*, which is the right default for pure shading-math
-  libraries, and tells the resolver to accept the package against
-  any consumer target); `capabilities` (optional, DNF of Slang
-  atoms per §3.4 — use the *public* atom form, e.g. `sm_6_5` not
-  `_sm_6_5`; capability-neutral if empty or absent).
+  backends; the glossary in §1 names the ones this proposal expects
+  to see in the wild, but slangc is the source of truth — unknown
+  strings emit a publisher-visible warning and pass through, so the
+  registry isn't on the critical path for slangc's target-list
+  evolution. Absence means *target-agnostic*: the resolver accepts
+  the package against any consumer target); `capabilities`
+  (optional, DNF of Slang atoms per §3.4 — atoms from
+  `slang-capabilities.capdef`, e.g. `_sm_6_5`. The underscore-
+  prefixed form is the actual atom; bare forms like `sm_6_5` are
+  source-code aliases that slangc expands to a disjunction at
+  `[require]`-attribute parse time, and aliases get rewritten
+  between releases — registries store atoms for stable identity.
+  Capability-neutral if empty or absent).
 - **API shape.** `entry_points` (optional, libraries omit;
-  `[[entry_points]]` array of `{ name, stage }`; `stage` is any
-  string slangc accepts, per the alias table in
-  `command-line-slangc-reference.md` — Slang itself does not
-  designate a canonical form between e.g. `pixel`/`fragment` or
-  `domain`/`tesseval`); `exports.interfaces` (optional, a
-  registry-discovery hint listing publicly-exposed interfaces — not
-  a Slang access-control declaration; Slang's access control is
-  `public` / `internal` / `private` in source).
+  `[[entry_points]]` array of `{ name, stage }`; `stage` is a
+  stage-group capability atom (`vertex`, `fragment`, `compute`,
+  `raygeneration`, …) per `slang-capabilities.capdef`. slangc's
+  CLI accepts additional aliases (`pixel` ↔ `fragment` etc.) but
+  the manifest uses atoms for the same stability reason
+  capabilities do).
 - **Dependencies.** `[dependencies]` table (optional). The exact
   constraint-string grammar (caret, tilde, ranges, bare versions)
   is §3.5's call; the example below uses Cargo-flavoured strings
@@ -289,7 +297,7 @@ repository   = "https://github.com/example/pkg"
 keywords     = ["brdf", "shading"]
 targets      = ["hlsl", "spirv", "metal", "wgsl"]
 capabilities = [                   # optional; DNF of Slang atoms (see §3.4)
-  ["hlsl", "sm_6_5"],
+  ["hlsl", "_sm_6_5"],
   ["spirv_1_4", "SPV_KHR_ray_tracing"],
 ]
 
@@ -301,41 +309,61 @@ max_version = "<2027.0"            # optional
 name  = "main_cs"
 stage = "compute"
 
-[exports]                          # optional; registry discovery hint
-interfaces = ["IBRDF", "ISampler"]
-
 [dependencies]                     # constraint syntax illustrative; see §3.5
 "@alice/disney-brdf"  = "^0.3"
 "@alice/envmap-utils" = "1.2"
 ```
 
-**Excluded / deferred.**
+A registry-side index can derive each package's exposed interfaces
+by parsing the module's `public interface` declarations, so there's
+no separate `[exports]` manifest field in the initial spec.
+
+**Excluded / deferred in the initial spec.** (Relaxable in a
+follow-up iteration of this proposal if Slang adoption surfaces
+concrete need.)
 
 - **`features`** (Cargo-style conditional-compilation flags) —
-  deferred to v1. Cargo's feature system is one of its hardest
-  debugging surfaces, and there's no clear shader-specific use case
-  that justifies the complexity upfront. v0 packages either depend
-  on something or don't.
+  deferred. Cargo's feature system is one of its hardest debugging
+  surfaces, and there's no clear shader-specific use case that
+  justifies the complexity upfront. Initial spec: a package either
+  depends on something or it doesn't.
 - **Build scripts** — excluded. §3.9 already commits to "no build
-  scripts in v0." Manifest is declarative only.
-- **Multi-module packages** — v0 ships one Slang module per package.
-  A module may span multiple `.slang` files via `__include` (per §1's
-  glossary); the constraint is one module identity per package, not
-  one file. Authors who want a related family of modules publish a
-  small constellation of packages.
-  Relaxable in v1 if the manifest complexity proves worth it.
+  scripts." Manifest is declarative only.
+- **Multi-module packages** — one Slang module per package in the
+  initial spec. A module may span multiple `.slang` files via
+  `__include` (per §1's glossary); the constraint is one module
+  identity per package, not one file. Authors who want a related
+  family of modules publish a small constellation of packages.
 - **Non-Slang assets** (LUTs, ONNX weights, sampling tables) —
-  excluded from v0 packages. Assets distributed via a separate
-  mechanism we'll figure out in v1. This matches the source-only
-  direction §3.3 is heading and keeps the registry's scope tight.
+  excluded from packages in the initial spec. Distribution of such
+  assets is out of scope here; matches the source-only direction
+  §3.3 is heading.
 
-**Open questions.**
+**Slang surfaces this proposal depends on.** Explicit so that any
+change to these by the Slang team would be a coordination point,
+not a silent breakage:
+
+- *Module identity* — the linker treats string-form module names
+  (`module "@org/pkg";`) as full-string identities; see
+  `experiments/module-name-identity/`.
+- *Capability atoms* — atom names in `slang-capabilities.capdef`
+  are stable across releases; aliases are not. The manifest stores
+  atoms.
+- *Capability inference* — `slangc` propagates `[require]`
+  declarations along the call graph to entry points; the digest
+  in §3.1 is built on this being a sound operation.
+- *`-emit-ir` / `.slang-module` shape* — emitted bytes are
+  reproducible for the same source on the same slangc; see
+  `experiments/semver-break-catalog/probe-dump-module.txt`. The
+  digest spec (§8 `sig-digest-spec.md`) builds on this.
+
+If any of these surfaces changes meaningfully, the corresponding
+piece of the proposal needs an RFC, not a patch.
+
+**Open question.**
 
 - Exact SPDX list revision the validator pins (3.x family is fine;
   the specific revision is `manifest-spec.md` territory).
-- Whether the `[exports]` discovery hint is worth carrying in v0 at
-  all, given that a registry could derive the same information by
-  parsing the module's `public` interface declarations.
 - What `slangpm publish` actually validates before upload — the
   catalogue-grounded digest check (§3.1) is mandatory, but whether
   publish also runs a target-compile pre-check is §3.6 / `cli-ux.md`
@@ -383,8 +411,8 @@ supports?
 
 **Slang wrinkle.** Capability satisfaction is not the registry's job. Slang
 itself enforces `[require(...)]` declarations at type-check time, with an
-implication lattice that handles subsumption automatically (`sm_6_5` implies
-`sm_6_0`, `spvShaderClockKHR` implies `SPV_KHR_shader_clock` implies
+implication lattice that handles subsumption automatically (`_sm_6_5` implies
+`_sm_6_0`, `spvShaderClockKHR` implies `SPV_KHR_shader_clock` implies
 `spirv_1_0`, etc.) and a DNF normal form across multiple `[require]`
 attributes on a function. The registry's role is narrower: surface the
 **author-declared capability DNF** in the index so the resolver can fail
@@ -557,7 +585,7 @@ escape hatch.
 | Dimension                           | Options on the table        | Must decide before code | Deferred until            |
 | ----------------------------------- | --------------------------- | ----------------------- | ------------------------- |
 | 3.1 Identity & versioning           | naming: scoped at every layer; semver semantics: mechanical Elm-style enforcement (digest spec deferred); pre-1.0: standard convention | **decided**            | —                         |
-| 3.2 Manifest format & fields        | TOML; required: name, version, license, slang.min_version; features/multi-module/assets deferred to v1 | **decided**            | —                         |
+| 3.2 Manifest format & fields        | TOML; required: name, version, license, slang.min_version; features / multi-module / non-Slang assets deferred to a follow-up iteration | **decided**            | —                         |
 | 3.3 Source vs. precompiled          | source / artifact / hybrid  | **yes**                | —                         |
 | 3.4 Compiler / target / cap matrix  | surface declared DNF / expand to explicit matrix | no | after 3.3 |
 | 3.5 Resolver + lockfile             | MVS / SAT / PubGrub         | no                      | after 3.1 + 3.2           |
@@ -586,9 +614,6 @@ license = "MIT"
 
 [slang]
 min_version = ">=2025.2"
-
-[exports]
-interfaces = ["IBRDF"]
 ```
 
 Pure shading math, no special capability requirements, target-agnostic
@@ -614,7 +639,7 @@ name    = "@bob/engine-shaders"
 version = "0.0.0"
 license = "Apache-2.0"
 targets = ["spirv"]
-capabilities = [["spirv_1_4", "sm_6_5"]]
+capabilities = [["spirv_1_4", "_sm_6_5"]]
 
 [slang]
 min_version = ">=2025.2"
@@ -636,7 +661,7 @@ file and links a `Slang::deps` INTERFACE target.
 > time. The resolver's job is to verify that *at least one* clause of each
 > dependency's declared DNF is compatible with the consumer's target/profile
 > set. Example: `@alice/envmap-sampling` declares
-> `[["hlsl", "sm_6_5", "subgroup_basic"], ["spirv_1_4", "subgroup_basic"]]` and the
+> `[["hlsl", "_sm_6_5", "subgroup_basic"], ["spirv_1_4", "subgroup_basic"]]` and the
 > consumer's `targets = ["wgsl"]`. No clause is wgsl-compatible — resolver
 > rejects with a message naming the package, the consumer's target, and
 > the (target-incompatible) declared clauses. Final per-call-site
@@ -672,7 +697,7 @@ authors      = ["Alice <a@example.com>"]
 repository   = "https://github.com/example/envmap-sampling"
 targets      = ["hlsl", "spirv", "metal", "wgsl"]
 capabilities = [
-  ["hlsl", "sm_6_2"],
+  ["hlsl", "_sm_6_2"],
   ["spirv_1_3"],
   ["metal"],
   ["wgsl"],
@@ -681,9 +706,6 @@ capabilities = [
 [slang]
 min_version = ">=2025.2"
 max_version = "<2027.0"
-
-[exports]
-interfaces = ["IEnvmapSampler"]
 
 [dependencies]
 "@alice/disney-brdf" = "^0.3"
@@ -702,7 +724,7 @@ interfaces = ["IEnvmapSampler"]
   "slang": { "min": "2025.2", "max": "<2027.0" },
   "targets": ["hlsl", "spirv", "metal", "wgsl"],
   "capabilities": [
-    ["hlsl", "sm_6_2"],
+    ["hlsl", "_sm_6_2"],
     ["spirv_1_3"],
     ["metal"],
     ["wgsl"]
