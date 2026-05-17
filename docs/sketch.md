@@ -227,7 +227,7 @@ any), and exposed interfaces (for downstream conformance).
 - **C. Slang-native syntax.** A `package` declaration inside Slang itself.
   Maximally idiomatic; needs compiler support and tooling churn.
 
-**Decision: TOML (option A).** Cargo's `Cargo.toml` and Rust's
+**Decision: TOML (option A).** Cargo's `Cargo.toml` and Python's
 `pyproject.toml` are the obvious precedents; comments, lightweight
 typing, and broad parser availability all favour it. JSON is fine for
 machine generation but loses comments, which manifests benefit from.
