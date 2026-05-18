@@ -391,7 +391,7 @@ needs an RFC, not a patch:
 
 ---
 
-### 3.3 Source vs. precompiled distribution &nbsp;&nbsp; `MUST-DECIDE-NOW`
+### 3.3 Source vs. precompiled distribution &nbsp;&nbsp; `DECIDED`
 
 **Problem.** Does the registry ship `.slang` sources, `.slang-module`
 artifacts, or both?
@@ -413,18 +413,49 @@ blobs.
   consumer's profile matches, otherwise compiled locally. Closer to a build
   cache than a binary distribution.
 
-**Recommended frame.** Treat sources as canonical (C). Artifact cache is a
-v1 optimization; the manifest and index need to allow it but the MVP can
-ignore it.
+**Decision: A (source-only).** The registry stores `.slang` source
+tarballs; consumers always compile from source. No `.slang-module`
+artifacts in the registry — not even as an optional cache.
 
-**Open questions.**
+Why source-only over the original "sources canonical, artifacts as
+cache" framing:
 
-- Does the registry ever distribute *only* artifacts (closed-source vendor
-  shaders)? Probably yes eventually; out of scope for v0.
+- **Don't reinvent Wheels.** Python's per-platform Wheels added
+  years of ecosystem complexity (per-(OS × ABI × arch) builds,
+  manylinux compatibility tags, the audit-wheel tooling) for a
+  language whose compilation is genuinely expensive. Slang
+  compilation isn't C++; the consumer-side cost is small enough
+  that the artifact-cache machinery isn't worth its weight.
+- **`.slang-module` bytes evolve with slangc by design.** The team
+  has built explicit IR-module compatibility machinery
+  (`-get-module-info`, `loadModuleInfoFromIRBlob`,
+  `-get-supported-module-versions` per
+  `design/backwards-compat-for-ir-modules.md`) precisely because
+  raw bytes change across releases. A registry that ships
+  artifacts has to live with — and surface — the resulting
+  `(slangc-version × target × capability-set)` cross-product.
+  Source-only sidesteps the whole matrix.
+- **§3.4 was already grounded in source-canonical.** Capability
+  satisfaction is slangc's job (see §3.4 decision); the registry
+  surfaces each package's declared DNF so the resolver can fail
+  fast. That model assumes slangc has source to operate on.
+- **The §3.1 digest** is computed against source. Artifact
+  distribution would add a second canonicalization surface for
+  no benefit.
+
+Options B (artifact-only) and C (artifact-cache) are not just
+deferred — they're ruled out as the wrong fit for this proposal.
+Either can be revisited in a separate proposal if a use case ever
+demands it.
+
+**Out of scope for this proposal.** Closed-source vendor shaders
+(registry serves artifacts without source). Vendors with that need
+can distribute binaries through other channels; this proposal does
+not try to be the universal Slang-artifact distribution mechanism.
 
 ---
 
-### 3.4 Compiler / target / capability matrix &nbsp;&nbsp; `DEFER` (depends on 3.3)
+### 3.4 Compiler / target / capability matrix &nbsp;&nbsp; `DECIDED`
 
 **Problem.** How does the index advertise which profiles a package version
 supports?
@@ -452,8 +483,14 @@ re-implement Slang's satisfaction logic in the resolver.
   profile. Heavyweight; presupposes artifact-canonical distribution (3.3);
   defer indefinitely.
 
-**Tag.** Deferred until 3.3 lands. If 3.3 = source-only or source-canonical,
-option A is the obvious choice — Slang already does the hard work.
+**Decision: A.** With §3.3 locked at source-only, option C is ruled out
+structurally (no artifacts to build), and option B is the wrong shape —
+the cross-product brittles every slangc release for no benefit, since
+the consumer is going to invoke slangc anyway. Option A is what the
+rest of the design already assumed: the registry surfaces each
+package's declared DNF, the resolver uses it for fail-fast
+target/profile rejection, and `slangc` handles final satisfaction at
+compile time.
 
 ---
 
@@ -606,8 +643,8 @@ escape hatch.
 | ----------------------------------- | --------------------------- | ----------------------- | ------------------------- |
 | 3.1 Identity & versioning           | naming: scoped at every layer; semver semantics: mechanical Elm-style enforcement (digest spec deferred); pre-1.0: standard convention | **decided**            | —                         |
 | 3.2 Manifest format & fields        | TOML; required: name, version, license, slang.compiler_min; features / multi-module / non-Slang assets deferred to a follow-up iteration | **decided**            | —                         |
-| 3.3 Source vs. precompiled          | source / artifact / hybrid  | **yes**                | —                         |
-| 3.4 Compiler / target / cap matrix  | surface declared DNF / expand to explicit matrix | no | after 3.3 |
+| 3.3 Source vs. precompiled          | source-only; artifact distribution out of scope | **decided** | — |
+| 3.4 Compiler / target / cap matrix  | surface declared DNF as-is | **decided** | — |
 | 3.5 Resolver + lockfile             | MVS / SAT / PubGrub         | no                      | after 3.1 + 3.2           |
 | 3.6 Registry architecture           | git / API / CDN / OCI       | **yes**                | —                         |
 | 3.7 Publishing & auth               | tokens / org / Sigstore     | no                      | after 3.6                 |
@@ -779,8 +816,8 @@ slangc_version = "2026.8.1"
 
 ## 8. What's next
 
-Decide the remaining `MUST-DECIDE-NOW` rows in the ledger (3.2, 3.3,
-3.6). Once those are locked, fork this document into:
+Decide the remaining `MUST-DECIDE-NOW` row in the ledger (3.6).
+Once that's locked, fork this document into:
 
 - `manifest-spec.md` — normative schema and validation rules.
 - `registry-protocol.md` — index layout, publish flow, auth.
